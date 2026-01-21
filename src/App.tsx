@@ -7,7 +7,7 @@ import { ConfirmDialog } from './components/ConfirmDialog';
 import { CustomizableButton } from './components/CustomizableButton';
 import { ButtonCustomizationSettings } from './components/ButtonCustomizationSettings';
 import { ButtonImageUpload } from './components/ButtonImageUpload';
-import { SearchResultsPanel } from './components/SearchResultsPanel.tsx';
+import { SearchResultsPanel } from './components/SearchResultsPanel';
 import { VideoFile } from './types/video';
 import { useButtonCustomization } from './hooks/useButtonCustomization';
 import { globalSearch } from './utils/globalSearch';
