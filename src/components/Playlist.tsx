@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { VideoFile } from '../types/video';
-import { Play, Pause, Clock, AlertCircle, ArrowRight, Shuffle, Repeat, Trash2, X, Pencil } from 'lucide-react';
+import { Play, Pause, Clock, AlertCircle, ArrowRight, Shuffle, Repeat, Trash2, X, Pencil, GripVertical } from 'lucide-react';
 
 type PlayMode = 'normal' | 'sequential' | 'random';
 
@@ -17,6 +17,7 @@ interface PlaylistProps {
   onLoopToggle: () => void;
   isPlaying: boolean;
   videoAnnotationCounts?: Map<string, number>;
+  onReorderVideos?: (startIndex: number, endIndex: number) => void;
 }
 
 export const Playlist: React.FC<PlaylistProps> = ({
@@ -31,8 +32,11 @@ export const Playlist: React.FC<PlaylistProps> = ({
   isLoopEnabled,
   onLoopToggle,
   isPlaying,
-  videoAnnotationCounts
+  videoAnnotationCounts,
+  onReorderVideos
 }) => {
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const formatTime = (seconds: number) => {
     if (isNaN(seconds) || seconds === 0) return '--:--';
     const mins = Math.floor(seconds / 60);
@@ -43,6 +47,37 @@ export const Playlist: React.FC<PlaylistProps> = ({
   const formatProgress = (progress: number, duration: number) => {
     if (duration === 0) return 0;
     return Math.min(100, (progress / duration) * 100);
+  };
+
+  // 拖拽处理函数
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/html', e.currentTarget.innerHTML);
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverIndex(index);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverIndex(null);
+  };
+
+  const handleDrop = (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    if (draggedIndex !== null && draggedIndex !== dropIndex && onReorderVideos) {
+      onReorderVideos(draggedIndex, dropIndex);
+    }
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+    setDragOverIndex(null);
   };
 
   return (
@@ -110,24 +145,41 @@ export const Playlist: React.FC<PlaylistProps> = ({
             {videos.map((video, index) => (
               <div
                 key={`${video.path}-${index}`}
+                draggable={true}
+                onDragStart={(e) => handleDragStart(e, index)}
+                onDragOver={(e) => handleDragOver(e, index)}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => handleDrop(e, index)}
+                onDragEnd={handleDragEnd}
                 className={`relative rounded-lg mb-2 transition-all duration-200 ${
                   index === currentIndex
                     ? 'bg-blue-600 text-white shadow-lg'
                     : 'bg-gray-800 text-gray-300'
+                } ${
+                  draggedIndex === index ? 'opacity-50' : ''
+                } ${
+                  dragOverIndex === index ? 'border-2 border-blue-400' : ''
                 }`}
               >
-                <button
-                  onClick={() => onSelectVideo(index)}
-                  className="w-full text-left p-3 hover:bg-opacity-80 transition-all duration-200"
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="flex-shrink-0 mt-1">
-                      {index === currentIndex ? (
-                        <div className="w-8 h-8 bg-blue-500 rounded flex items-center justify-center">
-                          {isPlaying ? (
-                            <Pause size={16} fill="white" />
-                          ) : (
-                            <Play size={16} fill="white" />
+                <div className="flex items-center">
+                  <div 
+                    className="cursor-move p-3 hover:bg-gray-700 rounded-l-lg"
+                    title="拖拽排序"
+                  >
+                    <GripVertical size={20} className="text-gray-400" />
+                  </div>
+                  <button
+                    onClick={() => onSelectVideo(index)}
+                    className="flex-1 text-left p-3 hover:bg-opacity-80 transition-all duration-200"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="flex-shrink-0 mt-1">
+                        {index === currentIndex ? (
+                          <div className="w-8 h-8 bg-blue-500 rounded flex items-center justify-center">
+                            {isPlaying ? (
+                              <Pause size={16} fill="white" />
+                            ) : (
+                              <Play size={16} fill="white" />
                           )}
                         </div>
                       ) : (
@@ -201,6 +253,7 @@ export const Playlist: React.FC<PlaylistProps> = ({
                 >
                   <X size={16} />
                 </button>
+                </div>
               </div>
             ))}
           </div>
