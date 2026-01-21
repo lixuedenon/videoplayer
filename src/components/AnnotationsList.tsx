@@ -1,5 +1,5 @@
 // src/components/AnnotationsList.tsx
-// TypeScript React组件 - 标注列表组件,支持手动搜索按钮触发跨视频搜索
+// TypeScript React组件 - 标注列表组件,搜索功能只搜索标注(不搜索视频和片段)
 import React, { useState, useEffect, useMemo } from 'react';
 import { Trash2, Download, Clock, Video, Search, X } from 'lucide-react';
 import type { Annotation } from '../types/annotation';
@@ -11,12 +11,13 @@ import { searchVideoSegments } from '../utils/search';
 import { searchAnnotations } from '../utils/database';
 
 interface SearchResult {
-  type: 'video' | 'segment' | 'annotation';
+  type: 'annotation';
   videoName: string;
   videoUrl?: string;
   timestamp?: number;
   content: string;
   highlight?: string;
+  annotation: Annotation;
 }
 
 interface AnnotationsListProps {
@@ -95,7 +96,7 @@ export const AnnotationsList: React.FC<AnnotationsListProps> = ({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // 手动触发搜索(点击搜索按钮或按回车键)
+  // 手动触发搜索(点击搜索按钮或按回车键),只搜索标注
   const performSearch = async () => {
     if (!query.trim()) {
       setSearchResults([]);
@@ -106,45 +107,7 @@ export const AnnotationsList: React.FC<AnnotationsListProps> = ({
     const results: SearchResult[] = [];
     const lowerQuery = query.toLowerCase();
 
-    // 搜索视频名称
-    videos.forEach(video => {
-      const videoNameLower = video.name.toLowerCase();
-      const matches = isExactMatch
-        ? videoNameLower === lowerQuery
-        : videoNameLower.includes(lowerQuery);
-
-      if (matches) {
-        results.push({
-          type: 'video',
-          videoName: video.name,
-          videoUrl: video.url || video.path,
-          content: video.name,
-          highlight: query
-        });
-      }
-    });
-
-    // 搜索视频片段
-    const segments = await searchVideoSegments(query);
-    segments.forEach(segment => {
-      const textContentLower = (segment.text_content || '').toLowerCase();
-      const matches = isExactMatch
-        ? textContentLower === lowerQuery
-        : textContentLower.includes(lowerQuery);
-
-      if (matches) {
-        results.push({
-          type: 'segment',
-          videoName: segment.video_name,
-          videoUrl: segment.video_url,
-          timestamp: segment.key_frame_time,
-          content: segment.text_content || '',
-          highlight: query
-        });
-      }
-    });
-
-    // 搜索标注(跨视频)
+    // 只搜索标注(跨视频)
     const annotationsResults = await searchAnnotations(query);
     annotationsResults.forEach(annotation => {
       const nameLower = (annotation.name || '').toLowerCase();
@@ -191,7 +154,8 @@ export const AnnotationsList: React.FC<AnnotationsListProps> = ({
             videoUrl: annotation.video_url,
             timestamp: annotation.timestamp,
             content: annotation.name || `涂鸦标注 @ ${formatTime(annotation.timestamp)}`,
-            highlight: query
+            highlight: query,
+            annotation: annotation
           });
         }
       }
@@ -226,19 +190,6 @@ export const AnnotationsList: React.FC<AnnotationsListProps> = ({
     setQuery('');
     setSearchResults([]);
     setIsSearchMode(false);
-  };
-
-  const getResultIcon = (type: string) => {
-    switch (type) {
-      case 'video':
-        return '🎥';
-      case 'segment':
-        return '✂️';
-      case 'annotation':
-        return '✏️';
-      default:
-        return '📄';
-    }
   };
 
   const handleAnnotationClick = (annotation: Annotation) => {
@@ -309,7 +260,7 @@ export const AnnotationsList: React.FC<AnnotationsListProps> = ({
                   performSearch();
                 }
               }}
-              placeholder="搜索视频、片段、标注..."
+              placeholder="搜索标注名称、内容..."
               className="w-full bg-gray-700 text-white pl-10 pr-3 py-2 rounded-lg border border-gray-600 focus:border-blue-500 focus:outline-none text-sm"
             />
           </div>
@@ -352,31 +303,75 @@ export const AnnotationsList: React.FC<AnnotationsListProps> = ({
         </div>
       ) : isSearchMode && searchResults.length > 0 ? (
         <div className="space-y-3 max-h-96 overflow-y-auto">
-          {searchResults.map((result, index) => (
+          {searchResults.map((result, index) => result.annotation && (
             <div
               key={index}
-              className="bg-gray-700 rounded-lg overflow-hidden hover:bg-gray-600 transition cursor-pointer"
-              onClick={() => handleResultClick(result)}
+              className="bg-gray-700 rounded-lg overflow-hidden hover:bg-gray-600 transition group"
             >
-              <div className="p-3">
-                <div className="flex items-start gap-2 mb-2">
-                  <span className="text-2xl">{getResultIcon(result.type)}</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-white font-medium text-sm mb-1">
-                      {highlightText(result.videoName, result.highlight || '')}
+              <button
+                onClick={() => handleResultClick(result)}
+                className="w-full text-left"
+              >
+                {result.annotation.thumbnail && (
+                  <ThumbnailImage
+                    thumbnail={result.annotation.thumbnail}
+                    alt={`涂鸦 @ ${formatTime(result.annotation.timestamp)}`}
+                  />
+                )}
+                <div className="p-3">
+                  {result.annotation.name && (
+                    <div className="text-white font-medium text-sm mb-1 truncate" title={result.annotation.name}>
+                      {highlightText(result.annotation.name, result.highlight || '')}
                     </div>
-                    {result.content && result.type !== 'video' && (
-                      <div className="text-gray-300 text-xs mb-1">
-                        {highlightText(result.content, result.highlight || '')}
-                      </div>
-                    )}
-                    {result.timestamp !== undefined && (
-                      <div className="text-gray-400 text-xs">
-                        时间: {formatTime(result.timestamp)}
-                      </div>
-                    )}
+                  )}
+                  <div className="text-gray-300 text-xs mb-1">
+                    {highlightText(result.videoName, result.highlight || '')}
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-300 text-sm">
+                      {formatTime(result.annotation.timestamp)}
+                    </span>
+                    <span className="text-gray-400 text-xs">
+                      {new Date(result.annotation.created_at).toLocaleDateString()}
+                    </span>
                   </div>
                 </div>
+              </button>
+              <div className="px-3 pb-3 flex gap-2">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDownload(result.annotation);
+                  }}
+                  className="flex-1 flex items-center justify-center gap-1 px-2 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs rounded transition"
+                  title="下载截图"
+                >
+                  <Download size={14} />
+                  图片
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDownloadVideo(result.annotation);
+                  }}
+                  disabled={downloadingIds.has(result.annotation.id)}
+                  className="flex-1 flex items-center justify-center gap-1 px-2 py-2 bg-purple-600 hover:bg-purple-500 text-white text-xs rounded transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  title={`下载视频片段 (前${videoSegmentSettings.beforeBuffer}秒 - 后${videoSegmentSettings.afterBuffer}秒)`}
+                >
+                  <Video size={14} />
+                  {downloadingIds.has(result.annotation.id) ? '下载中' : '视频'}
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete(result.annotation.id);
+                  }}
+                  className="flex-1 flex items-center justify-center gap-1 px-2 py-2 bg-red-600 hover:bg-red-500 text-white text-xs rounded transition"
+                  title="删除涂鸦"
+                >
+                  <Trash2 size={14} />
+                  删除
+                </button>
               </div>
             </div>
           ))}
