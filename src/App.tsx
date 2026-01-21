@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Folder, Link, SkipBack, SkipForward, FilePlus, Settings, Image as ImageIcon } from 'lucide-react';
+import { Folder, Link, SkipBack, SkipForward, FilePlus, Settings, Image as ImageIcon, Search } from 'lucide-react';
 import { VideoPlayer } from './components/VideoPlayer';
 import { Playlist } from './components/Playlist';
 import { AddUrlDialog } from './components/AddUrlDialog';
@@ -7,8 +7,10 @@ import { ConfirmDialog } from './components/ConfirmDialog';
 import { CustomizableButton } from './components/CustomizableButton';
 import { ButtonCustomizationSettings } from './components/ButtonCustomizationSettings';
 import { ButtonImageUpload } from './components/ButtonImageUpload';
+import { SearchResultsPanel } from './components/SearchResultsPanel';
 import { VideoFile } from './types/video';
 import { useButtonCustomization } from './hooks/useButtonCustomization';
+import { globalSearch } from './utils/globalSearch';
 import {
   requestDirectoryAccess,
   loadVideosFromDirectory,
@@ -98,6 +100,48 @@ function App() {
   const handleAutoPlayComplete = useCallback(() => {
     setShouldAutoPlay(false);
   }, []);
+
+  const [globalSearchQuery, setGlobalSearchQuery] = useState('');
+  const [globalSearchResults, setGlobalSearchResults] = useState<any[]>([]);
+  const [isGlobalSearchOpen, setIsGlobalSearchOpen] = useState(false);
+  const [isGlobalSearchExact, setIsGlobalSearchExact] = useState(false);
+
+  const handleGlobalSearch = async () => {
+    if (!globalSearchQuery.trim()) {
+      setGlobalSearchResults([]);
+      setIsGlobalSearchOpen(false);
+      return;
+    }
+
+    const results = await globalSearch(globalSearchQuery, videos, isGlobalSearchExact);
+    setGlobalSearchResults(results);
+    setIsGlobalSearchOpen(true);
+  };
+
+  const handleCloseGlobalSearch = () => {
+    setIsGlobalSearchOpen(false);
+  };
+
+  const handleSelectSearchVideo = (video: VideoFile) => {
+    const index = videos.findIndex(v => v.name === video.name);
+    if (index >= 0) {
+      handleSelectVideo(index);
+    }
+    setIsGlobalSearchOpen(false);
+  };
+
+  const handleSelectSearchAnnotation = (videoUrl: string, timestamp: number) => {
+    const video = videos.find(v => (v.url || v.path) === videoUrl || v.name === videoUrl);
+    if (video) {
+      const index = videos.findIndex(v => v.name === video.name);
+      if (index >= 0) {
+        const bufferBefore = parseFloat(localStorage.getItem('replayBufferBefore') || '10');
+        setPendingSeekTime(Math.max(0, timestamp - bufferBefore));
+        handleSelectVideo(index);
+      }
+    }
+    setIsGlobalSearchOpen(false);
+  };
 
   const handleTogglePlay = useCallback(() => {
     switchButton('play');
@@ -699,6 +743,45 @@ function App() {
             )}
           </div>
 
+          {/* 全局搜索框 */}
+          {videos.length > 0 && (
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                <input
+                  type="text"
+                  value={globalSearchQuery}
+                  onChange={(e) => setGlobalSearchQuery(e.target.value)}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      handleGlobalSearch();
+                    }
+                  }}
+                  placeholder="搜索视频、标注..."
+                  className="bg-gray-800 text-white pl-10 pr-3 py-2 rounded-lg border border-gray-700 focus:border-blue-500 focus:outline-none text-sm w-64"
+                />
+              </div>
+              <button
+                onClick={handleGlobalSearch}
+                disabled={!globalSearchQuery.trim()}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                搜索
+              </button>
+              <button
+                onClick={() => setIsGlobalSearchExact(!isGlobalSearchExact)}
+                className={`px-3 py-2 rounded-lg text-sm font-medium transition ${
+                  isGlobalSearchExact
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                }`}
+                title={isGlobalSearchExact ? '精确匹配' : '模糊匹配'}
+              >
+                {isGlobalSearchExact ? '=' : '≈'}
+              </button>
+            </div>
+          )}
+
           <div className="flex items-center gap-3">
             {videos.length > 0 && (
               <div className="flex items-center gap-2">
@@ -861,6 +944,16 @@ function App() {
             isPlaying={isPlaying}
             videoAnnotationCounts={videoAnnotationCounts}
             onReorderVideos={handleReorderVideos}
+          />
+          
+          {/* 全局搜索结果面板 */}
+          <SearchResultsPanel
+            results={globalSearchResults}
+            isVisible={isGlobalSearchOpen}
+            onClose={handleCloseGlobalSearch}
+            onSelectVideo={handleSelectSearchVideo}
+            onSelectAnnotation={handleSelectSearchAnnotation}
+            searchQuery={globalSearchQuery}
           />
         </div>
       </div>
