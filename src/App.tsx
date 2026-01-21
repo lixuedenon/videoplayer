@@ -488,12 +488,15 @@ function App() {
   };
 
   const handleSwitchVideo = useCallback((videoId: string, timestamp: number) => {
-    const targetIndex = videos.findIndex(v => (v.url || v.path) === videoId);
-    if (targetIndex >= 0) {
-      setPendingSeekTime(timestamp);
-      handleSelectVideo(targetIndex);
-    }
-  }, [videos, handleSelectVideo]);
+  const targetIndex = videos.findIndex(v => (v.url || v.path) === videoId);
+  if (targetIndex >= 0) {
+    // 应用replayBufferBefore设置,与同视频播放行为一致
+    const bufferBefore = parseFloat(localStorage.getItem('replayBufferBefore') || '10');
+    const startTime = Math.max(0, timestamp - bufferBefore);
+    setPendingSeekTime(startTime);  // 传入计算后的起始时间
+    handleSelectVideo(targetIndex);
+  }
+}, [videos, handleSelectVideo]);
 
   const handleVideoEnded = useCallback(() => {
     if (playMode === 'sequential') {
