@@ -154,6 +154,15 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
       const handleCanPlay = () => {
         if (initialProgress > 0) {
           video.currentTime = initialProgress;
+          // 设置播放停止时间,应用replayBufferAfter
+          const bufferAfter = parseFloat(localStorage.getItem('replayBufferAfter') || '5');
+          // 从initialProgress(已经减去了bufferBefore)恢复原始timestamp
+          // 但实际上这里不需要恢复,因为用户期望的是从当前时间播放一段时间
+          // 所以直接从initialProgress往后加bufferAfter
+          const bufferBefore = parseFloat(localStorage.getItem('replayBufferBefore') || '10');
+          const originalTimestamp = initialProgress + bufferBefore;
+          const endTime = Math.min(duration, originalTimestamp + bufferAfter);
+          seekTargetEndTime.current = endTime;
         }
       };
 
@@ -251,6 +260,12 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
       onLoadedMetadata(total);
       if (initialProgress > 0) {
         videoRef.current.currentTime = initialProgress;
+        // 设置播放停止时间,应用replayBufferAfter
+        const bufferAfter = parseFloat(localStorage.getItem('replayBufferAfter') || '5');
+        const bufferBefore = parseFloat(localStorage.getItem('replayBufferBefore') || '10');
+        const originalTimestamp = initialProgress + bufferBefore;
+        const endTime = Math.min(total, originalTimestamp + bufferAfter);
+        seekTargetEndTime.current = endTime;
       }
     }
   };
