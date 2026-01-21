@@ -1,3 +1,5 @@
+// src/components/AnnotationsList.tsx
+// TypeScript React组件 - 标注列表组件,支持跨视频搜索标注、片段和视频
 import React, { useState, useEffect, useMemo } from 'react';
 import { Trash2, Download, Clock, Video, Search, X } from 'lucide-react';
 import type { Annotation } from '../types/annotation';
@@ -86,6 +88,7 @@ export const AnnotationsList: React.FC<AnnotationsListProps> = ({
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [isExactMatch, setIsExactMatch] = useState(false);
 
+  // 非搜索模式下显示当前视频的标注
   const videoAnnotations = annotations.filter(a => a.video_url === currentVideoUrl);
   const displayAnnotations = videoAnnotations;
 
@@ -95,6 +98,7 @@ export const AnnotationsList: React.FC<AnnotationsListProps> = ({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // 搜索逻辑:跨视频搜索标注、片段和视频名称
   useEffect(() => {
     const performSearch = async () => {
       if (!query.trim()) {
@@ -106,6 +110,7 @@ export const AnnotationsList: React.FC<AnnotationsListProps> = ({
       const results: SearchResult[] = [];
       const lowerQuery = query.toLowerCase();
 
+      // 搜索视频名称
       videos.forEach(video => {
         const videoNameLower = video.name.toLowerCase();
         const matches = isExactMatch
@@ -123,6 +128,7 @@ export const AnnotationsList: React.FC<AnnotationsListProps> = ({
         }
       });
 
+      // 搜索视频片段
       const segments = await searchVideoSegments(query);
       segments.forEach(segment => {
         const textContentLower = (segment.text_content || '').toLowerCase();
@@ -142,6 +148,7 @@ export const AnnotationsList: React.FC<AnnotationsListProps> = ({
         }
       });
 
+      // 搜索标注(跨视频)
       const annotationsResults = await searchAnnotations(query);
       annotationsResults.forEach(annotation => {
         const nameLower = (annotation.name || '').toLowerCase();
@@ -151,10 +158,35 @@ export const AnnotationsList: React.FC<AnnotationsListProps> = ({
           : nameLower.includes(lowerQuery) || textContentLower.includes(lowerQuery);
 
         if (matches) {
-          const video = videos.find(v =>
-            (v.url && v.url === annotation.video_url) ||
-            v.name === annotation.video_url
-          );
+          // 增强视频匹配逻辑:支持多种标识符格式(URL/name/path/文件名)
+          const video = videos.find(v => {
+            // 精确匹配 URL
+            if (v.url && v.url === annotation.video_url) {
+              return true;
+            }
+            
+            // 精确匹配 name
+            if (v.name === annotation.video_url) {
+              return true;
+            }
+            
+            // 精确匹配 path
+            if (v.path === annotation.video_url) {
+              return true;
+            }
+            
+            // 提取文件名进行模糊匹配(处理路径差异)
+            const getFileName = (str: string) => {
+              return str.split('/').pop()?.split('\\').pop() || str;
+            };
+            
+            const annotationFileName = getFileName(annotation.video_url);
+            if (v.name === annotationFileName || v.path === annotationFileName) {
+              return true;
+            }
+            
+            return false;
+          });
 
           if (video) {
             results.push({
