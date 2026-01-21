@@ -28,7 +28,6 @@ export async function globalSearch(
   const results: SearchResult[] = [];
   const lowerQuery = query.toLowerCase();
 
-  // 搜索视频名称
   videos.forEach((video, index) => {
     const videoNameLower = video.name.toLowerCase();
     const matches = isExactMatch
@@ -40,13 +39,12 @@ export async function globalSearch(
         type: 'video',
         id: `video-${index}`,
         name: video.name,
-        thumbnail: undefined, // 视频缩略图后续实现
+        thumbnail: undefined,
         data: video
       });
     }
   });
 
-  // 搜索标注
   try {
     const annotations = await searchAnnotations(query);
     
@@ -58,7 +56,6 @@ export async function globalSearch(
         : nameLower.includes(lowerQuery) || textContentLower.includes(lowerQuery);
 
       if (matches) {
-        // 查找对应的视频
         const video = videos.find(v => {
           if (v.url && v.url === annotation.video_url) return true;
           if (v.name === annotation.video_url) return true;
