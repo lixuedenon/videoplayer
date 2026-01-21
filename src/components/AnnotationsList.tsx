@@ -1,5 +1,5 @@
 // src/components/AnnotationsList.tsx
-// TypeScript React组件 - 标注列表组件,支持跨视频搜索标注、片段和视频
+// TypeScript React组件 - 标注列表组件,支持手动搜索按钮触发跨视频搜索
 import React, { useState, useEffect, useMemo } from 'react';
 import { Trash2, Download, Clock, Video, Search, X } from 'lucide-react';
 import type { Annotation } from '../types/annotation';
@@ -85,12 +85,9 @@ export const AnnotationsList: React.FC<AnnotationsListProps> = ({
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isSearchMode, setIsSearchMode] = useState(false);
-  const [selectedIndex, setSelectedIndex] = useState(0);
   const [isExactMatch, setIsExactMatch] = useState(false);
 
-  // 非搜索模式下显示当前视频的标注
   const videoAnnotations = annotations.filter(a => a.video_url === currentVideoUrl);
-  const displayAnnotations = videoAnnotations;
 
   const formatTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
@@ -98,117 +95,111 @@ export const AnnotationsList: React.FC<AnnotationsListProps> = ({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // 搜索逻辑:跨视频搜索标注、片段和视频名称
-  useEffect(() => {
-    const performSearch = async () => {
-      if (!query.trim()) {
-        setSearchResults([]);
-        setIsSearchMode(false);
-        return;
+  // 手动触发搜索(点击搜索按钮或按回车键)
+  const performSearch = async () => {
+    if (!query.trim()) {
+      setSearchResults([]);
+      setIsSearchMode(false);
+      return;
+    }
+
+    const results: SearchResult[] = [];
+    const lowerQuery = query.toLowerCase();
+
+    // 搜索视频名称
+    videos.forEach(video => {
+      const videoNameLower = video.name.toLowerCase();
+      const matches = isExactMatch
+        ? videoNameLower === lowerQuery
+        : videoNameLower.includes(lowerQuery);
+
+      if (matches) {
+        results.push({
+          type: 'video',
+          videoName: video.name,
+          videoUrl: video.url || video.path,
+          content: video.name,
+          highlight: query
+        });
       }
+    });
 
-      const results: SearchResult[] = [];
-      const lowerQuery = query.toLowerCase();
+    // 搜索视频片段
+    const segments = await searchVideoSegments(query);
+    segments.forEach(segment => {
+      const textContentLower = (segment.text_content || '').toLowerCase();
+      const matches = isExactMatch
+        ? textContentLower === lowerQuery
+        : textContentLower.includes(lowerQuery);
 
-      // 搜索视频名称
-      videos.forEach(video => {
-        const videoNameLower = video.name.toLowerCase();
-        const matches = isExactMatch
-          ? videoNameLower === lowerQuery
-          : videoNameLower.includes(lowerQuery);
+      if (matches) {
+        results.push({
+          type: 'segment',
+          videoName: segment.video_name,
+          videoUrl: segment.video_url,
+          timestamp: segment.key_frame_time,
+          content: segment.text_content || '',
+          highlight: query
+        });
+      }
+    });
 
-        if (matches) {
-          results.push({
-            type: 'video',
-            videoName: video.name,
-            videoUrl: video.url || video.path,
-            content: video.name,
-            highlight: query
-          });
-        }
-      });
+    // 搜索标注(跨视频)
+    const annotationsResults = await searchAnnotations(query);
+    annotationsResults.forEach(annotation => {
+      const nameLower = (annotation.name || '').toLowerCase();
+      const textContentLower = (annotation.text_content || '').toLowerCase();
+      const matches = isExactMatch
+        ? nameLower === lowerQuery || textContentLower === lowerQuery
+        : nameLower.includes(lowerQuery) || textContentLower.includes(lowerQuery);
 
-      // 搜索视频片段
-      const segments = await searchVideoSegments(query);
-      segments.forEach(segment => {
-        const textContentLower = (segment.text_content || '').toLowerCase();
-        const matches = isExactMatch
-          ? textContentLower === lowerQuery
-          : textContentLower.includes(lowerQuery);
-
-        if (matches) {
-          results.push({
-            type: 'segment',
-            videoName: segment.video_name,
-            videoUrl: segment.video_url,
-            timestamp: segment.key_frame_time,
-            content: segment.text_content || '',
-            highlight: query
-          });
-        }
-      });
-
-      // 搜索标注(跨视频)
-      const annotationsResults = await searchAnnotations(query);
-      annotationsResults.forEach(annotation => {
-        const nameLower = (annotation.name || '').toLowerCase();
-        const textContentLower = (annotation.text_content || '').toLowerCase();
-        const matches = isExactMatch
-          ? nameLower === lowerQuery || textContentLower === lowerQuery
-          : nameLower.includes(lowerQuery) || textContentLower.includes(lowerQuery);
-
-        if (matches) {
-          // 增强视频匹配逻辑:支持多种标识符格式(URL/name/path/文件名)
-          const video = videos.find(v => {
-            // 精确匹配 URL
-            if (v.url && v.url === annotation.video_url) {
-              return true;
-            }
-            
-            // 精确匹配 name
-            if (v.name === annotation.video_url) {
-              return true;
-            }
-            
-            // 精确匹配 path
-            if (v.path === annotation.video_url) {
-              return true;
-            }
-            
-            // 提取文件名进行模糊匹配(处理路径差异)
-            const getFileName = (str: string) => {
-              return str.split('/').pop()?.split('\\').pop() || str;
-            };
-            
-            const annotationFileName = getFileName(annotation.video_url);
-            if (v.name === annotationFileName || v.path === annotationFileName) {
-              return true;
-            }
-            
-            return false;
-          });
-
-          if (video) {
-            results.push({
-              type: 'annotation',
-              videoName: video.name,
-              videoUrl: annotation.video_url,
-              timestamp: annotation.timestamp,
-              content: annotation.name || `涂鸦标注 @ ${formatTime(annotation.timestamp)}`,
-              highlight: query
-            });
+      if (matches) {
+        // 增强视频匹配逻辑:支持多种标识符格式(URL/name/path/文件名)
+        const video = videos.find(v => {
+          // 精确匹配 URL
+          if (v.url && v.url === annotation.video_url) {
+            return true;
           }
+          
+          // 精确匹配 name
+          if (v.name === annotation.video_url) {
+            return true;
+          }
+          
+          // 精确匹配 path
+          if (v.path === annotation.video_url) {
+            return true;
+          }
+          
+          // 提取文件名进行模糊匹配(处理路径差异)
+          const getFileName = (str: string) => {
+            return str.split('/').pop()?.split('\\').pop() || str;
+          };
+          
+          const annotationFileName = getFileName(annotation.video_url);
+          if (v.name === annotationFileName || v.path === annotationFileName) {
+            return true;
+          }
+          
+          return false;
+        });
+
+        if (video) {
+          results.push({
+            type: 'annotation',
+            videoName: video.name,
+            videoUrl: annotation.video_url,
+            timestamp: annotation.timestamp,
+            content: annotation.name || `涂鸦标注 @ ${formatTime(annotation.timestamp)}`,
+            highlight: query
+          });
         }
-      });
+      }
+    });
 
-      setSearchResults(results);
-      setIsSearchMode(results.length > 0 || query.trim().length > 0);
-      setSelectedIndex(0);
-    };
-
-    const debounceTimer = setTimeout(performSearch, 300);
-    return () => clearTimeout(debounceTimer);
-  }, [query, videos, annotations, isExactMatch]);
+    setSearchResults(results);
+    setIsSearchMode(true);
+  };
 
   const highlightText = (text: string, highlight: string): React.ReactNode => {
     if (!highlight.trim()) return text;
@@ -225,38 +216,16 @@ export const AnnotationsList: React.FC<AnnotationsListProps> = ({
     );
   };
 
-  const handleSelectSearchResult = (result: SearchResult) => {
+  // 点击搜索结果,跳转到对应视频和时间点
+  const handleResultClick = (result: SearchResult) => {
     onSelectResult(result.videoName, result.timestamp);
+  };
+
+  // 清空搜索
+  const handleClearSearch = () => {
     setQuery('');
     setSearchResults([]);
     setIsSearchMode(false);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (!isSearchMode || searchResults.length === 0) return;
-
-    switch (e.key) {
-      case 'ArrowDown':
-        e.preventDefault();
-        setSelectedIndex(prev => (prev + 1) % searchResults.length);
-        break;
-      case 'ArrowUp':
-        e.preventDefault();
-        setSelectedIndex(prev => (prev - 1 + searchResults.length) % searchResults.length);
-        break;
-      case 'Enter':
-        e.preventDefault();
-        if (searchResults[selectedIndex]) {
-          handleSelectSearchResult(searchResults[selectedIndex]);
-        }
-        break;
-      case 'Escape':
-        e.preventDefault();
-        setQuery('');
-        setSearchResults([]);
-        setIsSearchMode(false);
-        break;
-    }
   };
 
   const getResultIcon = (type: string) => {
@@ -327,46 +296,53 @@ export const AnnotationsList: React.FC<AnnotationsListProps> = ({
         涂鸦列表 ({annotations.length})
       </h3>
 
-      <div className="mb-4 relative">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="搜索视频、片段、标注..."
-            className="w-full bg-gray-700 text-white pl-10 pr-10 py-2 rounded-lg border border-gray-600 focus:border-blue-500 focus:outline-none text-sm"
-          />
-          {query && (
-            <button
-              onClick={() => {
-                setQuery('');
-                setSearchResults([]);
-                setIsSearchMode(false);
+      <div className="mb-4">
+        <div className="flex gap-2 mb-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter') {
+                  performSearch();
+                }
               }}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+              placeholder="搜索视频、片段、标注..."
+              className="w-full bg-gray-700 text-white pl-10 pr-3 py-2 rounded-lg border border-gray-600 focus:border-blue-500 focus:outline-none text-sm"
+            />
+          </div>
+          <button
+            onClick={performSearch}
+            disabled={!query.trim()}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            搜索
+          </button>
+          {isSearchMode && (
+            <button
+              onClick={handleClearSearch}
+              className="px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded-lg text-sm font-medium transition"
             >
-              <X size={18} />
+              清空
             </button>
           )}
         </div>
 
-        {query.trim() && (
-          <div className="flex items-center justify-between gap-2 mt-2 p-2 bg-gray-700 rounded-lg">
-            <span className="text-gray-400 text-xs">搜索模式:</span>
-            <button
-              onClick={() => setIsExactMatch(!isExactMatch)}
-              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                isExactMatch
-                  ? 'bg-blue-600 text-white shadow-lg'
-                  : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
-              }`}
-            >
-              {isExactMatch ? '✓ 精准匹配' : '≈ 模糊匹配'}
-            </button>
-          </div>
-        )}
+        <div className="flex items-center justify-between gap-2 p-2 bg-gray-700 rounded-lg">
+          <span className="text-gray-400 text-xs">搜索模式:</span>
+          <button
+            onClick={() => setIsExactMatch(!isExactMatch)}
+            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
+              isExactMatch
+                ? 'bg-blue-600 text-white shadow-lg'
+                : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
+            }`}
+          >
+            {isExactMatch ? '✓ 精准匹配' : '≈ 模糊匹配'}
+          </button>
+        </div>
       </div>
 
       {isSearchMode && searchResults.length === 0 ? (
@@ -380,7 +356,7 @@ export const AnnotationsList: React.FC<AnnotationsListProps> = ({
             <div
               key={index}
               className="bg-gray-700 rounded-lg overflow-hidden hover:bg-gray-600 transition cursor-pointer"
-              onClick={() => handleSelectSearchResult(result)}
+              onClick={() => handleResultClick(result)}
             >
               <div className="p-3">
                 <div className="flex items-start gap-2 mb-2">
@@ -405,14 +381,14 @@ export const AnnotationsList: React.FC<AnnotationsListProps> = ({
             </div>
           ))}
         </div>
-      ) : displayAnnotations.length === 0 ? (
+      ) : !isSearchMode && videoAnnotations.length === 0 ? (
         <div className="text-gray-400 text-center py-8">
           <p>暂无涂鸦</p>
           <p className="text-sm mt-2">暂停视频后点击"涂鸦"按钮开始标注</p>
         </div>
-      ) : (
+      ) : !isSearchMode ? (
         <div className="space-y-3 max-h-96 overflow-y-auto">
-          {displayAnnotations.map(annotation => (
+          {videoAnnotations.map(annotation => (
           <div
             key={annotation.id}
             className="bg-gray-700 rounded-lg overflow-hidden hover:bg-gray-600 transition group"
@@ -473,7 +449,7 @@ export const AnnotationsList: React.FC<AnnotationsListProps> = ({
           </div>
         ))}
         </div>
-      )}
+      ) : null}
     </div>
   );
 };
