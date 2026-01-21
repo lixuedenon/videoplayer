@@ -149,12 +149,9 @@ export const Playlist: React.FC<PlaylistProps> = ({
                   <div className="absolute -top-1 left-0 right-0 h-0.5 bg-blue-500 z-10" />
                 )}
                 <div
-                  draggable={true}
-                  onDragStart={(e) => handleDragStart(e, index)}
                   onDragOver={(e) => handleDragOver(e, index)}
                   onDragLeave={handleDragLeave}
                   onDrop={(e) => handleDrop(e, index)}
-                  onDragEnd={handleDragEnd}
                   className={`relative rounded-lg mb-2 transition-all duration-200 ${
                     index === currentIndex
                       ? 'bg-blue-600 text-white shadow-lg'
@@ -165,6 +162,9 @@ export const Playlist: React.FC<PlaylistProps> = ({
                 >
                 <div className="flex items-center">
                   <div 
+                    draggable={true}
+                    onDragStart={(e) => handleDragStart(e, index)}
+                    onDragEnd={handleDragEnd}
                     className="cursor-move p-3 hover:bg-gray-700 rounded-l-lg"
                     title="拖拽排序"
                   >
@@ -175,6 +175,15 @@ export const Playlist: React.FC<PlaylistProps> = ({
                     className="flex-1 text-left p-3 hover:bg-opacity-80 transition-all duration-200"
                   >
                     <div className="flex items-start gap-3">
+                      {/* 标注标记放在最前面 */}
+                      {videoAnnotationCounts && videoAnnotationCounts.get(video.url || video.path) > 0 && (
+                        <div className="flex items-center gap-1 bg-green-600 text-white px-2 py-0.5 rounded-full text-xs flex-shrink-0 mt-1" title={`${videoAnnotationCounts.get(video.url || video.path)} 个涂鸦`}>
+                          <Pencil size={10} />
+                          <span>{videoAnnotationCounts.get(video.url || video.path)}</span>
+                        </div>
+                      )}
+                      
+                      {/* 播放图标/序号 */}
                       <div className="flex-shrink-0 mt-1">
                         {index === currentIndex ? (
                           <div className="w-8 h-8 bg-blue-500 rounded flex items-center justify-center">
@@ -193,19 +202,15 @@ export const Playlist: React.FC<PlaylistProps> = ({
 
                     <div className="flex-1 min-w-0 pr-8">
                       <div className="flex items-center gap-2">
+                        {/* 文件名,字体缩小10% */}
                         <p
                           className={`font-medium truncate ${
                             index === currentIndex ? 'text-white' : 'text-gray-200'
                           }`}
+                          style={{ fontSize: '0.9em' }}
                         >
                           {video.name}
                         </p>
-                        {videoAnnotationCounts && videoAnnotationCounts.get(video.url || video.path) > 0 && (
-                          <div className="flex items-center gap-1 bg-green-600 text-white px-2 py-0.5 rounded-full text-xs flex-shrink-0" title={`${videoAnnotationCounts.get(video.url || video.path)} 个涂鸦`}>
-                            <Pencil size={10} />
-                            <span>{videoAnnotationCounts.get(video.url || video.path)}</span>
-                          </div>
-                        )}
                         {!video.file && !video.url && (
                           <AlertCircle size={14} className="text-yellow-500 flex-shrink-0" title="文件不可用 - 页面已刷新" />
                         )}
