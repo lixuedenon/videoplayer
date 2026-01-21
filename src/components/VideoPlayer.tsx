@@ -190,13 +190,23 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
 
     const attemptAutoPlay = () => {
       console.log('Attempting autoplay, readyState:', video.readyState);
+      
+      // 等待playing事件,确保视频真正开始播放
+      const handlePlaying = () => {
+        console.log('Video actually started playing');
+        onAutoPlayComplete?.();
+        video.removeEventListener('playing', handlePlaying);
+      };
+      
+      video.addEventListener('playing', handlePlaying, { once: true });
+      
       video.play()
         .then(() => {
-          console.log('Autoplay successful');
-          onAutoPlayComplete?.();
+          console.log('Autoplay play() promise resolved');
         })
         .catch((error) => {
           console.error('Autoplay failed:', error);
+          video.removeEventListener('playing', handlePlaying);
           onAutoPlayComplete?.();
         });
     };
