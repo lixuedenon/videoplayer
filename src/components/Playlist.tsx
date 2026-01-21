@@ -143,24 +143,26 @@ export const Playlist: React.FC<PlaylistProps> = ({
         ) : (
           <div className="p-2">
             {videos.map((video, index) => (
-              <div
-                key={`${video.path}-${index}`}
-                draggable={true}
-                onDragStart={(e) => handleDragStart(e, index)}
-                onDragOver={(e) => handleDragOver(e, index)}
-                onDragLeave={handleDragLeave}
-                onDrop={(e) => handleDrop(e, index)}
-                onDragEnd={handleDragEnd}
-                className={`relative rounded-lg mb-2 transition-all duration-200 ${
-                  index === currentIndex
-                    ? 'bg-blue-600 text-white shadow-lg'
-                    : 'bg-gray-800 text-gray-300'
-                } ${
-                  draggedIndex === index ? 'opacity-50' : ''
-                } ${
-                  dragOverIndex === index ? 'border-2 border-blue-400' : ''
-                }`}
-              >
+              <div key={`${video.path}-${index}`} className="relative">
+                {/* 插入位置指示线 */}
+                {dragOverIndex === index && draggedIndex !== index && (
+                  <div className="absolute -top-1 left-0 right-0 h-0.5 bg-blue-500 z-10" />
+                )}
+                <div
+                  draggable={true}
+                  onDragStart={(e) => handleDragStart(e, index)}
+                  onDragOver={(e) => handleDragOver(e, index)}
+                  onDragLeave={handleDragLeave}
+                  onDrop={(e) => handleDrop(e, index)}
+                  onDragEnd={handleDragEnd}
+                  className={`relative rounded-lg mb-2 transition-all duration-200 ${
+                    index === currentIndex
+                      ? 'bg-blue-600 text-white shadow-lg'
+                      : 'bg-gray-800 text-gray-300'
+                  } ${
+                    draggedIndex === index ? 'opacity-30 scale-95' : ''
+                  }`}
+                >
                 <div className="flex items-center">
                   <div 
                     className="cursor-move p-3 hover:bg-gray-700 rounded-l-lg"
@@ -254,6 +256,7 @@ export const Playlist: React.FC<PlaylistProps> = ({
                   <X size={16} />
                 </button>
                 </div>
+              </div>
               </div>
             ))}
           </div>
