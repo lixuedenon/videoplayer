@@ -81,6 +81,7 @@ export const AnnotationsList: React.FC<AnnotationsListProps> = ({
   onSelectResult
 }) => {
   const [downloadingIds, setDownloadingIds] = useState<Set<string>>(new Set());
+  const [downloadAbortControllers] = useState<Map<string, () => void>>(new Map());
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isSearchMode, setIsSearchMode] = useState(false);
@@ -225,16 +226,34 @@ export const AnnotationsList: React.FC<AnnotationsListProps> = ({
   };
 
   const handleDownloadVideo = async (annotation: Annotation) => {
+    console.log('handleDownloadVideo called for annotation:', annotation.id);
     if (!videoElement) {
       alert('视频播放器不可用');
       return;
     }
 
     if (downloadingIds.has(annotation.id)) {
+      console.log('Already downloading, returning');
       return;
     }
 
-    setDownloadingIds(prev => new Set(prev).add(annotation.id));
+    let aborted = false;
+    const abortDownload = () => {
+      aborted = true;
+      downloadAbortControllers.delete(annotation.id);
+      setDownloadingIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(annotation.id);
+        return newSet;
+      });
+    };
+
+    downloadAbortControllers.set(annotation.id, abortDownload);
+    setDownloadingIds(prev => {
+      const newSet = new Set(prev).add(annotation.id);
+      console.log('Download started, downloadingIds:', Array.from(newSet));
+      return newSet;
+    });
 
     const startTime = Math.max(0, annotation.timestamp - videoSegmentSettings.beforeBuffer);
     const endTime = Math.min(videoElement.duration, annotation.timestamp + videoSegmentSettings.afterBuffer);
@@ -243,15 +262,40 @@ export const AnnotationsList: React.FC<AnnotationsListProps> = ({
     const filename = `${videoName}_${formatTime(annotation.timestamp)}`;
 
     try {
-      await downloadVideoSegment(videoElement, startTime, endTime, filename);
-    } catch (error) {
-      console.error('Failed to download video segment:', error);
+      // 创建一个可以检查中止状态的Promise包装
+      await new Promise<void>(async (resolve, reject) => {
+        if (aborted) {
+          reject(new Error('Download aborted'));
+          return;
+        }
+
+        try {
+          await downloadVideoSegment(videoElement, startTime, endTime, filename);
+          if (!aborted) {
+            resolve();
+          }
+        } catch (error) {
+          reject(error);
+        }
+      });
+    } catch (error: any) {
+      if (!aborted) {
+        console.error('Failed to download video segment:', error);
+      }
     } finally {
+      downloadAbortControllers.delete(annotation.id);
       setDownloadingIds(prev => {
         const newSet = new Set(prev);
         newSet.delete(annotation.id);
         return newSet;
       });
+    }
+  };
+
+  const handleCancelDownload = (annotationId: string) => {
+    const abortFn = downloadAbortControllers.get(annotationId);
+    if (abortFn) {
+      abortFn();
     }
   };
 
@@ -364,18 +408,35 @@ export const AnnotationsList: React.FC<AnnotationsListProps> = ({
                   <Download size={14} />
                   图片
                 </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDownloadVideo(result.annotation!);
-                  }}
-                  disabled={downloadingIds.has(result.annotation.id)}
-                  className="flex-1 flex items-center justify-center gap-1 px-2 py-2 bg-purple-600 hover:bg-purple-500 text-white text-xs rounded transition disabled:opacity-50 disabled:cursor-not-allowed"
-                  title={`下载视频片段 (前${videoSegmentSettings.beforeBuffer}秒 - 后${videoSegmentSettings.afterBuffer}秒)`}
-                >
-                  <Video size={14} />
-                  {downloadingIds.has(result.annotation.id) ? '下载中' : '视频'}
-                </button>
+                {(() => {
+                  const isDownloading = downloadingIds.has(result.annotation.id);
+                  console.log('Rendering button for annotation:', result.annotation.id, 'isDownloading:', isDownloading);
+                  return isDownloading ? (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleCancelDownload(result.annotation.id);
+                      }}
+                      className="flex-1 flex items-center justify-center gap-1 px-2 py-2 bg-red-600 hover:bg-red-500 text-white text-xs rounded transition"
+                      title="停止下载"
+                    >
+                      <X size={14} />
+                      停止
+                    </button>
+                  ) : (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDownloadVideo(result.annotation);
+                      }}
+                      className="flex-1 flex items-center justify-center gap-1 px-2 py-2 bg-purple-600 hover:bg-purple-500 text-white text-xs rounded transition"
+                      title={`下载视频片段 (前${videoSegmentSettings.beforeBuffer}秒 - 后${videoSegmentSettings.afterBuffer}秒)`}
+                    >
+                      <Video size={14} />
+                      视频
+                    </button>
+                  );
+                })()}
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -438,15 +499,29 @@ export const AnnotationsList: React.FC<AnnotationsListProps> = ({
                 <Download size={14} />
                 图片
               </button>
-              <button
-                onClick={() => handleDownloadVideo(annotation)}
-                disabled={downloadingIds.has(annotation.id)}
-                className="flex-1 flex items-center justify-center gap-1 px-2 py-2 bg-purple-600 hover:bg-purple-500 text-white text-xs rounded transition disabled:opacity-50 disabled:cursor-not-allowed"
-                title={`下载视频片段 (前${videoSegmentSettings.beforeBuffer}秒 - 后${videoSegmentSettings.afterBuffer}秒)`}
-              >
-                <Video size={14} />
-                {downloadingIds.has(annotation.id) ? '下载中' : '视频'}
-              </button>
+              {(() => {
+                const isDownloading = downloadingIds.has(annotation.id);
+                console.log('Rendering button for annotation:', annotation.id, 'isDownloading:', isDownloading);
+                return isDownloading ? (
+                  <button
+                    onClick={() => handleCancelDownload(annotation.id)}
+                    className="flex-1 flex items-center justify-center gap-1 px-2 py-2 bg-red-600 hover:bg-red-500 text-white text-xs rounded transition"
+                    title="停止下载"
+                  >
+                    <X size={14} />
+                    停止
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => handleDownloadVideo(annotation)}
+                    className="flex-1 flex items-center justify-center gap-1 px-2 py-2 bg-purple-600 hover:bg-purple-500 text-white text-xs rounded transition"
+                    title={`下载视频片段 (前${videoSegmentSettings.beforeBuffer}秒 - 后${videoSegmentSettings.afterBuffer}秒)`}
+                  >
+                    <Video size={14} />
+                    视频
+                  </button>
+                );
+              })()}
               <button
                 onClick={() => onDelete(annotation.id)}
                 className="flex-1 flex items-center justify-center gap-1 px-2 py-2 bg-red-600 hover:bg-red-500 text-white text-xs rounded transition"
