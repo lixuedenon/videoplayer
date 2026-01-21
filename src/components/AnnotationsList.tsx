@@ -1,5 +1,3 @@
-// src/components/AnnotationsList.tsx
-// TypeScript React组件 - 标注列表组件,搜索功能只搜索标注(不搜索视频和片段)
 import React, { useState, useEffect, useMemo } from 'react';
 import { Trash2, Download, Clock, Video, Search, X } from 'lucide-react';
 import type { Annotation } from '../types/annotation';
@@ -96,7 +94,7 @@ export const AnnotationsList: React.FC<AnnotationsListProps> = ({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // 手动触发搜索(点击搜索按钮或按回车键),只搜索标注
+  // 手动触发搜索
   const performSearch = async () => {
     if (!query.trim()) {
       setSearchResults([]);
@@ -182,7 +180,11 @@ export const AnnotationsList: React.FC<AnnotationsListProps> = ({
 
   // 点击搜索结果,跳转到对应视频和时间点
   const handleResultClick = (result: SearchResult) => {
-    onSelectResult(result.videoName, result.timestamp);
+    if (result.annotation.video_url === currentVideoUrl) {
+      onSeek(result.annotation.timestamp);
+    } else {
+      onSeek(result.annotation.timestamp, result.annotation.video_url);
+    }
   };
 
   // 清空搜索
@@ -190,6 +192,19 @@ export const AnnotationsList: React.FC<AnnotationsListProps> = ({
     setQuery('');
     setSearchResults([]);
     setIsSearchMode(false);
+  };
+
+  const getResultIcon = (type: string) => {
+    switch (type) {
+      case 'video':
+        return '🎥';
+      case 'segment':
+        return '✂️';
+      case 'annotation':
+        return '✏️';
+      default:
+        return '📄';
+    }
   };
 
   const handleAnnotationClick = (annotation: Annotation) => {
@@ -260,7 +275,7 @@ export const AnnotationsList: React.FC<AnnotationsListProps> = ({
                   performSearch();
                 }
               }}
-              placeholder="搜索标注名称、内容..."
+              placeholder="搜索视频、片段、标注..."
               className="w-full bg-gray-700 text-white pl-10 pr-3 py-2 rounded-lg border border-gray-600 focus:border-blue-500 focus:outline-none text-sm"
             />
           </div>
@@ -341,7 +356,7 @@ export const AnnotationsList: React.FC<AnnotationsListProps> = ({
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleDownload(result.annotation);
+                    handleDownload(result.annotation!);
                   }}
                   className="flex-1 flex items-center justify-center gap-1 px-2 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs rounded transition"
                   title="下载截图"
@@ -352,7 +367,7 @@ export const AnnotationsList: React.FC<AnnotationsListProps> = ({
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleDownloadVideo(result.annotation);
+                    handleDownloadVideo(result.annotation!);
                   }}
                   disabled={downloadingIds.has(result.annotation.id)}
                   className="flex-1 flex items-center justify-center gap-1 px-2 py-2 bg-purple-600 hover:bg-purple-500 text-white text-xs rounded transition disabled:opacity-50 disabled:cursor-not-allowed"
@@ -364,7 +379,7 @@ export const AnnotationsList: React.FC<AnnotationsListProps> = ({
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    onDelete(result.annotation.id);
+                    onDelete(result.annotation!.id);
                   }}
                   className="flex-1 flex items-center justify-center gap-1 px-2 py-2 bg-red-600 hover:bg-red-500 text-white text-xs rounded transition"
                   title="删除涂鸦"
