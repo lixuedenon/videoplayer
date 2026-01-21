@@ -443,11 +443,15 @@ function App() {
   };
 
   const handleSelectVideo = async (index: number) => {
+    console.log('handleSelectVideo called with index:', index, 'currentIndex:', currentIndex);
     if (index >= 0 && index < videos.length) {
+      // 检查是否是当前视频且已加载
       if (index === currentIndex) {
         const video = document.querySelector('video');
+        console.log('Same index selected. video.src:', video?.src);
         if (video && video.src) {
           // 视频已加载,切换播放/暂停状态
+          console.log('Video loaded, toggling play/pause');
           if (video.paused) {
             video.play();
           } else {
@@ -455,14 +459,8 @@ function App() {
           }
           return;
         }
-        // 如果video.src未加载,强制重新加载视频
-        // 通过临时切换index来触发重新渲染
-        setCurrentIndex(-1);
-        setTimeout(() => {
-          setCurrentIndex(index);
-          setShouldAutoPlay(true);
-        }, 0);
-        return;
+        // 如果video.src未加载,继续执行加载逻辑,不要return
+        console.log('Video not loaded, will load it');
       }
 
       const selectedVideo = videos[index];
