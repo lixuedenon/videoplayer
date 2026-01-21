@@ -416,11 +416,38 @@ function App() {
     }
   };
 
+  const handleReorderVideos = (startIndex: number, endIndex: number) => {
+    const newVideos = [...videos];
+    const [movedVideo] = newVideos.splice(startIndex, 1);
+    newVideos.splice(endIndex, 0, movedVideo);
+    
+    // 更新order字段
+    const updatedVideos = newVideos.map((video, index) => ({
+      ...video,
+      order: index
+    }));
+    
+    setVideos(updatedVideos);
+    
+    // 更新currentIndex
+    if (currentIndex === startIndex) {
+      setCurrentIndex(endIndex);
+    } else if (startIndex < currentIndex && endIndex >= currentIndex) {
+      setCurrentIndex(currentIndex - 1);
+    } else if (startIndex > currentIndex && endIndex <= currentIndex) {
+      setCurrentIndex(currentIndex + 1);
+    }
+    
+    // 保存到数据库
+    savePlaylist(updatedVideos);
+  };
+
   const handleSelectVideo = async (index: number) => {
     if (index >= 0 && index < videos.length) {
       if (index === currentIndex) {
         const video = document.querySelector('video');
         if (video && video.src) {
+          // 视频已加载,切换播放/暂停状态
           if (video.paused) {
             video.play();
           } else {
@@ -428,8 +455,14 @@ function App() {
           }
           return;
         }
-        // If no src, continue to load the video
-        setShouldAutoPlay(true);
+        // 如果video.src未加载,强制重新加载视频
+        // 通过临时切换index来触发重新渲染
+        setCurrentIndex(-1);
+        setTimeout(() => {
+          setCurrentIndex(index);
+          setShouldAutoPlay(true);
+        }, 0);
+        return;
       }
 
       const selectedVideo = videos[index];
@@ -488,15 +521,15 @@ function App() {
   };
 
   const handleSwitchVideo = useCallback((videoId: string, timestamp: number) => {
-  const targetIndex = videos.findIndex(v => (v.url || v.path) === videoId);
-  if (targetIndex >= 0) {
-    // 应用replayBufferBefore设置,与同视频播放行为一致
-    const bufferBefore = parseFloat(localStorage.getItem('replayBufferBefore') || '10');
-    const startTime = Math.max(0, timestamp - bufferBefore);
-    setPendingSeekTime(startTime);  // 传入计算后的起始时间
-    handleSelectVideo(targetIndex);
-  }
-}, [videos, handleSelectVideo]);
+    const targetIndex = videos.findIndex(v => (v.url || v.path) === videoId);
+    if (targetIndex >= 0) {
+      // 应用replayBufferBefore设置,与同视频播放行为一致
+      const bufferBefore = parseFloat(localStorage.getItem('replayBufferBefore') || '10');
+      const startTime = Math.max(0, timestamp - bufferBefore);
+      setPendingSeekTime(startTime);
+      handleSelectVideo(targetIndex);
+    }
+  }, [videos, handleSelectVideo]);
 
   const handleVideoEnded = useCallback(() => {
     if (playMode === 'sequential') {
@@ -789,7 +822,11 @@ function App() {
           <div className="h-full bg-black rounded-lg overflow-hidden shadow-2xl">
             <VideoPlayer
               videoUrl={currentVideoUrl}
-              videoId={videos[currentIndex]?.url || videos[currentIndex]?.path || null}
+              videoId={
+                videos[currentIndex]?.url?.startsWith('http')
+                  ? videos[currentIndex].url
+                  : (videos[currentIndex]?.name || videos[currentIndex]?.path || null)
+              }
               onEnded={handleVideoEnded}
               onTimeUpdate={handleTimeUpdate}
               onLoadedMetadata={handleLoadedMetadata}
@@ -825,6 +862,7 @@ function App() {
             onLoopToggle={() => setIsLoopEnabled(!isLoopEnabled)}
             isPlaying={isPlaying}
             videoAnnotationCounts={videoAnnotationCounts}
+            onReorderVideos={handleReorderVideos}
           />
         </div>
       </div>
