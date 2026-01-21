@@ -1,3 +1,5 @@
+// src/components/SearchBar.tsx
+// TypeScript React组件 - 搜索栏组件,支持跨视频搜索标注、片段和视频名称
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, X } from 'lucide-react';
 import { searchVideoSegments } from '../utils/search';
@@ -47,6 +49,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({ videos, onSelectResult }) 
 
       const searchResults: SearchResult[] = [];
 
+      // 搜索视频名称
       videos.forEach(video => {
         if (video.name.toLowerCase().includes(query.toLowerCase())) {
           searchResults.push({
@@ -59,6 +62,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({ videos, onSelectResult }) 
         }
       });
 
+      // 搜索视频片段
       const segments = await searchVideoSegments(query);
       segments.forEach(segment => {
         searchResults.push({
@@ -71,12 +75,38 @@ export const SearchBar: React.FC<SearchBarProps> = ({ videos, onSelectResult }) 
         });
       });
 
+      // 搜索标注(增强匹配逻辑)
       const annotations = await searchAnnotations(query);
       annotations.forEach(annotation => {
-        const video = videos.find(v =>
-          (v.url && v.url === annotation.video_url) ||
-          v.name === annotation.video_url
-        );
+        // 增强视频匹配逻辑:支持多种标识符格式(URL/name/path/文件名)
+        const video = videos.find(v => {
+          // 精确匹配 URL
+          if (v.url && v.url === annotation.video_url) {
+            return true;
+          }
+          
+          // 精确匹配 name
+          if (v.name === annotation.video_url) {
+            return true;
+          }
+          
+          // 精确匹配 path
+          if (v.path === annotation.video_url) {
+            return true;
+          }
+          
+          // 提取文件名进行模糊匹配(处理路径差异)
+          const getFileName = (str: string) => {
+            return str.split('/').pop()?.split('\\').pop() || str;
+          };
+          
+          const annotationFileName = getFileName(annotation.video_url);
+          if (v.name === annotationFileName || v.path === annotationFileName) {
+            return true;
+          }
+          
+          return false;
+        });
 
         if (video) {
           searchResults.push({
