@@ -25,6 +25,8 @@ interface SearchResultsPanelProps {
   onSelectVideo: (video: VideoFile) => void;
   onSelectAnnotation: (videoUrl: string, timestamp: number) => void;
   searchQuery: string;
+  isActive?: boolean;
+  onFocus?: () => void;
 }
 
 const ThumbnailImage: React.FC<{ thumbnail: string; alt: string }> = ({ thumbnail, alt }) => {
@@ -62,10 +64,10 @@ const ThumbnailImage: React.FC<{ thumbnail: string; alt: string }> = ({ thumbnai
   }, [thumbnail]);
 
   if (!imageUrl) {
-    return <div className="w-full h-48 bg-gray-700 animate-pulse" />;
+    return <div className="w-full h-55 bg-gray-700 animate-pulse" />;
   }
 
-  return <img src={imageUrl} alt={alt} className="w-full h-48 object-cover" />;
+  return <img src={imageUrl} alt={alt} className="w-full h-55 object-cover" />;
 };
 
 export const SearchResultsPanel: React.FC<SearchResultsPanelProps> = ({
@@ -74,7 +76,9 @@ export const SearchResultsPanel: React.FC<SearchResultsPanelProps> = ({
   onClose,
   onSelectVideo,
   onSelectAnnotation,
-  searchQuery
+  searchQuery,
+  isActive = true,
+  onFocus
 }) => {
   if (!isVisible) return null;
 
@@ -109,7 +113,12 @@ export const SearchResultsPanel: React.FC<SearchResultsPanelProps> = ({
   };
 
   return (
-    <div className="absolute top-0 right-0 w-[30%] h-full bg-gray-900 border-l border-gray-800 z-50 flex flex-col">
+    <div 
+      className={`absolute top-0 right-0 w-[30%] h-full bg-gray-900 border-l border-gray-800 flex flex-col ${
+        isActive ? 'z-50' : 'z-40'
+      }`}
+      onClick={onFocus}
+    >
       <div className="p-4 border-b border-gray-800 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Search size={18} className="text-white" />
@@ -162,7 +171,7 @@ export const SearchResultsPanel: React.FC<SearchResultsPanelProps> = ({
                     </div>
                   </div>
                 ) : (
-                  <div className="relative w-full h-48 bg-gray-700 flex items-center justify-center">
+                  <div className="relative w-full h-55 bg-gray-700 flex items-center justify-center">
                     <div className="text-gray-400 text-sm">无缩略图</div>
                     {/* 类型标签角标 */}
                     <div className="absolute top-2 left-2">
