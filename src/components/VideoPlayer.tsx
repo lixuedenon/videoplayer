@@ -788,6 +788,8 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
                 videoSegmentSettings={videoSegmentSettings}
                 videos={videos}
                 onSelectResult={onSelectResult || (() => {})}
+                isActive={activePanel === 'annotations'}
+                onFocus={() => onSetActivePanel?.('annotations')}
               />
             </div>
           </div>
