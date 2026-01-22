@@ -27,6 +27,8 @@ interface AnnotationsListProps {
   videoSegmentSettings: VideoSegmentSettings;
   videos: VideoFile[];
   onSelectResult: (videoName: string, timestamp?: number) => void;
+  isActive?: boolean;
+  onFocus?: () => void;
 }
 
 const ThumbnailImage: React.FC<{ thumbnail: string; alt: string }> = ({ thumbnail, alt }) => {
@@ -78,7 +80,9 @@ export const AnnotationsList: React.FC<AnnotationsListProps> = ({
   videoElement,
   videoSegmentSettings,
   videos,
-  onSelectResult
+  onSelectResult,
+  isActive = true,
+  onFocus
 }) => {
   const [downloadingIds, setDownloadingIds] = useState<Set<string>>(new Set());
   const [downloadAbortControllers] = useState<Map<string, () => void>>(new Map());
