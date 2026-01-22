@@ -16,15 +16,25 @@ interface SearchResult {
   data: VideoFile | Annotation;
 }
 
+interface DurationFilter {
+  enabled: boolean;
+  min: number;
+  max: number;
+}
+
+interface AnnotationCountFilter {
+  enabled: boolean;
+  count: number;
+}
+
 export async function globalSearch(
   query: string,
   videos: VideoFile[],
-  isExactMatch: boolean = false
+  isExactMatch: boolean = false,
+  durationFilter?: DurationFilter,
+  annotationCountFilter?: AnnotationCountFilter,
+  videoAnnotationCounts?: Map<string, number>
 ): Promise<SearchResult[]> {
-  if (!query.trim()) {
-    return [];
-  }
-
   const results: SearchResult[] = [];
   const lowerQuery = query.toLowerCase();
 
@@ -32,11 +42,25 @@ export async function globalSearch(
   for (let index = 0; index < videos.length; index++) {
     const video = videos[index];
     const videoNameLower = video.name.toLowerCase();
-    const matches = isExactMatch
+    
+    // 名称匹配(如果有查询词)
+    const nameMatches = !query.trim() || (isExactMatch
       ? videoNameLower === lowerQuery
-      : videoNameLower.includes(lowerQuery);
+      : videoNameLower.includes(lowerQuery));
 
-    if (matches) {
+    // 时长筛选
+    const durationMatches = !durationFilter?.enabled || (
+      video.duration >= durationFilter.min && 
+      video.duration <= durationFilter.max
+    );
+
+    // 标注数量筛选
+    const videoKey = video.url || video.path;
+    const annotationCount = videoAnnotationCounts?.get(videoKey) || 0;
+    const countMatches = !annotationCountFilter?.enabled || 
+      annotationCount === annotationCountFilter.count;
+
+    if (nameMatches && durationMatches && countMatches) {
       // 生成视频缩略图(从第30-100帧随机选择)
       let thumbnail: string | undefined = undefined;
       try {
@@ -59,16 +83,24 @@ export async function globalSearch(
 
   // 搜索标注
   try {
-    const annotations = await searchAnnotations(query);
+    const annotations = await searchAnnotations(query.trim() || ' ');
     
     annotations.forEach((annotation) => {
       const nameLower = (annotation.name || '').toLowerCase();
       const textContentLower = (annotation.text_content || '').toLowerCase();
-      const matches = isExactMatch
+      
+      // 名称/内容匹配(如果有查询词)
+      const contentMatches = !query.trim() || (isExactMatch
         ? nameLower === lowerQuery || textContentLower === lowerQuery
-        : nameLower.includes(lowerQuery) || textContentLower.includes(lowerQuery);
+        : nameLower.includes(lowerQuery) || textContentLower.includes(lowerQuery));
 
-      if (matches) {
+      // 时长筛选(标注的timestamp在范围内)
+      const timestampMatches = !durationFilter?.enabled || (
+        annotation.timestamp >= durationFilter.min && 
+        annotation.timestamp <= durationFilter.max
+      );
+
+      if (contentMatches && timestampMatches) {
         // 查找对应的视频
         const video = videos.find(v => {
           if (v.url && v.url === annotation.video_url) return true;
