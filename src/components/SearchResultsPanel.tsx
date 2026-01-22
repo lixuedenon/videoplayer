@@ -139,28 +139,49 @@ export const SearchResultsPanel: React.FC<SearchResultsPanelProps> = ({
                 className="bg-gray-800 rounded-lg overflow-hidden hover:bg-gray-700 transition cursor-pointer"
                 onClick={() => handleResultClick(result)}
               >
-                {result.thumbnail && (
-                  <ThumbnailImage
-                    thumbnail={result.thumbnail}
-                    alt={result.name}
-                  />
+                {/* 缩略图区域,标签作为角标 */}
+                {result.thumbnail ? (
+                  <div className="relative">
+                    <ThumbnailImage
+                      thumbnail={result.thumbnail}
+                      alt={result.name}
+                    />
+                    {/* 类型标签角标 */}
+                    <div className="absolute top-2 left-2">
+                      {result.type === 'video' ? (
+                        <div className="flex items-center gap-1 bg-blue-600 text-white px-2 py-1 rounded shadow-lg">
+                          <VideoIcon size={12} />
+                          <span className="text-xs font-medium">视频</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1 bg-green-600 text-white px-2 py-1 rounded shadow-lg">
+                          <Pencil size={12} />
+                          <span className="text-xs font-medium">标注</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="relative w-full h-48 bg-gray-700 flex items-center justify-center">
+                    <div className="text-gray-400 text-sm">无缩略图</div>
+                    {/* 类型标签角标 */}
+                    <div className="absolute top-2 left-2">
+                      {result.type === 'video' ? (
+                        <div className="flex items-center gap-1 bg-blue-600 text-white px-2 py-1 rounded shadow-lg">
+                          <VideoIcon size={12} />
+                          <span className="text-xs font-medium">视频</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1 bg-green-600 text-white px-2 py-1 rounded shadow-lg">
+                          <Pencil size={12} />
+                          <span className="text-xs font-medium">标注</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 )}
                 
                 <div className="p-3">
-                  <div className="flex items-center gap-2 mb-2">
-                    {result.type === 'video' ? (
-                      <div className="flex items-center gap-1 bg-blue-600 text-white px-2 py-0.5 rounded text-xs">
-                        <VideoIcon size={12} />
-                        <span>视频</span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-1 bg-green-600 text-white px-2 py-0.5 rounded text-xs">
-                        <Pencil size={12} />
-                        <span>标注</span>
-                      </div>
-                    )}
-                  </div>
-
                   <div className="text-white font-medium text-sm mb-1 truncate" title={result.name}>
                     {highlightText(result.name, searchQuery)}
                   </div>
