@@ -47,6 +47,9 @@ interface VideoPlayerProps {
   videos?: VideoFile[];
   onSelectResult?: (videoName: string, timestamp?: number) => void;
   onAnnotationChange?: () => void;
+  activePanel?: 'search' | 'annotations' | null;
+  onSetActivePanel?: (panel: 'search' | 'annotations' | null) => void;
+  isSeekFromAnnotation?: boolean;
 }
 
 const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
@@ -72,7 +75,10 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
   onButtonClick,
   videos = [],
   onSelectResult,
-  onAnnotationChange
+  onAnnotationChange,
+  activePanel = null,
+  onSetActivePanel,
+  isSeekFromAnnotation = false
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -152,17 +158,17 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
       setDuration(0);
 
       const handleCanPlay = () => {
-        if (initialProgress > 0) {
+        if (initialProgress > 0 && isSeekFromAnnotation) {
           video.currentTime = initialProgress;
           // 设置播放停止时间,应用replayBufferAfter
           const bufferAfter = parseFloat(localStorage.getItem('replayBufferAfter') || '5');
-          // 从initialProgress(已经减去了bufferBefore)恢复原始timestamp
-          // 但实际上这里不需要恢复,因为用户期望的是从当前时间播放一段时间
-          // 所以直接从initialProgress往后加bufferAfter
           const bufferBefore = parseFloat(localStorage.getItem('replayBufferBefore') || '10');
           const originalTimestamp = initialProgress + bufferBefore;
           const endTime = Math.min(duration, originalTimestamp + bufferAfter);
           seekTargetEndTime.current = endTime;
+        } else if (initialProgress > 0) {
+          // 正常播放,只设置进度,不设置自动暂停
+          video.currentTime = initialProgress;
         }
       };
 
@@ -259,6 +265,10 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
       if (seekTargetEndTime.current !== null && current >= seekTargetEndTime.current) {
         videoRef.current.pause();
         seekTargetEndTime.current = null;
+        // 清除isSeekFromAnnotation标志,避免影响后续视频
+        if (isSeekFromAnnotation && onAutoPlayComplete) {
+          onAutoPlayComplete();
+        }
       }
     }
   };
@@ -268,7 +278,7 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
       const total = videoRef.current.duration;
       setDuration(total);
       onLoadedMetadata(total);
-      if (initialProgress > 0) {
+      if (initialProgress > 0 && isSeekFromAnnotation) {
         videoRef.current.currentTime = initialProgress;
         // 设置播放停止时间,应用replayBufferAfter
         const bufferAfter = parseFloat(localStorage.getItem('replayBufferAfter') || '5');
@@ -276,6 +286,9 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
         const originalTimestamp = initialProgress + bufferBefore;
         const endTime = Math.min(total, originalTimestamp + bufferAfter);
         seekTargetEndTime.current = endTime;
+      } else if (initialProgress > 0) {
+        // 正常播放,只设置进度,不设置自动暂停
+        videoRef.current.currentTime = initialProgress;
       }
     }
   };
@@ -527,7 +540,11 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    setShowAnnotationsList(!showAnnotationsList);
+                    const newState = !showAnnotationsList;
+                    setShowAnnotationsList(newState);
+                    if (newState) {
+                      onSetActivePanel?.('annotations');
+                    }
                   }}
                   className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg shadow-lg transition-all hover:scale-105 relative"
                   title="查看涂鸦列表"
@@ -673,7 +690,13 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
                   </button>
 
                   <button
-                    onClick={() => setShowAnnotationsList(!showAnnotationsList)}
+                    onClick={() => {
+                      const newState = !showAnnotationsList;
+                      setShowAnnotationsList(newState);
+                      if (newState) {
+                        onSetActivePanel?.('annotations');
+                      }
+                    }}
                     className="flex items-center gap-2 px-3 py-1 bg-purple-600 hover:bg-purple-500 text-white rounded transition relative"
                     title="涂鸦列表"
                   >
@@ -739,7 +762,12 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
       )}
 
       {showAnnotationsList && (
-        <div className="fixed top-4 right-4 w-[30vw] max-h-[calc(100vh-2rem)] overflow-hidden z-50">
+        <div 
+          className={`fixed top-4 right-4 w-[30vw] max-h-[calc(100vh-2rem)] overflow-hidden ${
+            activePanel === 'annotations' ? 'z-50' : 'z-40'
+          }`}
+          onClick={() => onSetActivePanel?.('annotations')}
+        >
           <div className="bg-gray-900 rounded-lg shadow-2xl border border-gray-700">
             <div className="flex items-center justify-between p-4 border-b border-gray-700">
               <h3 className="text-white font-semibold">涂鸦列表</h3>
