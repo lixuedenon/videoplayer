@@ -132,7 +132,8 @@ function App() {
   const [activePanel, setActivePanel] = useState<ActivePanel>(null);
 
   const handleGlobalSearch = async () => {
-    if (!globalSearchQuery.trim()) {
+    // 如果既没有关键词，也没有启用筛选条件，则不搜索
+    if (!globalSearchQuery.trim() && !durationFilter.enabled && !annotationCountFilter.enabled) {
       setGlobalSearchResults([]);
       setIsGlobalSearchOpen(false);
       return;
