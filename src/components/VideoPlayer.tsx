@@ -790,7 +790,6 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
             </div>
           </div>
         </div>
-      </div>
 
       {showSettings && (
         <div className="fixed top-4 right-4 w-96 max-h-[calc(100vh-2rem)] z-50 flex flex-col">
