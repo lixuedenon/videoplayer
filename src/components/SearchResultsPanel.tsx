@@ -114,7 +114,7 @@ export const SearchResultsPanel: React.FC<SearchResultsPanelProps> = ({
 
   return (
     <div 
-      className={`fixed top-4 right-4 w-[30vw] max-h-[calc(100vh-2rem)] bg-gray-900 rounded-lg shadow-2xl border border-gray-700 flex flex-col overflow-hidden ${
+      className={`absolute top-0 right-0 w-full h-full bg-gray-900 rounded-lg shadow-2xl border border-gray-700 flex flex-col overflow-hidden ${
         isActive ? 'z-50' : 'z-40'
       }`}
       onClick={onFocus}
