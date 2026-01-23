@@ -744,7 +744,26 @@ function App() {
     }
   }, [videos, currentIndex]);
 
-  useKeyboardShortcuts({
+  // 点击外部关闭搜索下拉菜单
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      // 检查点击是否在搜索框或下拉菜单外部
+      if (showSearchDropdown && 
+          !target.closest('.search-dropdown-container')) {
+        setShowSearchDropdown(false);
+      }
+    };
+
+    if (showSearchDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [showSearchDropdown]);
+
+    useKeyboardShortcuts({
     onPlayPause: handlePlayPause,
     onSkipForward: handleSkipForward,
     onSkipBackward: handleSkipBackward,
@@ -784,7 +803,7 @@ function App() {
           {/* 全局搜索框 */}
           {videos.length > 0 && (
             <div className="flex items-center gap-2">
-              <div className="relative">
+              <div className="relative search-dropdown-container">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                 <input
                   type="text"
@@ -804,7 +823,7 @@ function App() {
                 />
 
                 {showSearchDropdown && (
-                  <div className="absolute top-full left-0 mt-2 w-80 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50 p-4">
+                  <div className="absolute bottom-full left-0 mb-2 w-80 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50 p-4">
                     <div className="flex items-center justify-between mb-3">
                       <span className="text-white text-sm font-medium">搜索筛选</span>
                       <button
@@ -1042,7 +1061,7 @@ function App() {
           </div>
         </div>
 
-        <div className="w-[30%] h-full">
+        <div className="w-[30%] h-full relative">
           <Playlist
             videos={videos}
             currentIndex={currentIndex}
