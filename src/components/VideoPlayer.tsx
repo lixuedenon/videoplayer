@@ -540,9 +540,8 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (!showAnnotationsList) {
-                      setShowAnnotationsList(true);
-                    }
+                    // 立即设置两个状态
+                    setShowAnnotationsList(true);
                     onSetActivePanel?.('annotations');
                   }}
                   className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg shadow-lg transition-all hover:scale-105 relative"
@@ -690,9 +689,7 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
 
                   <button
                     onClick={() => {
-                      if (!showAnnotationsList) {
-                        setShowAnnotationsList(true);
-                      }
+                      setShowAnnotationsList(true);
                       onSetActivePanel?.('annotations');
                     }}
                     className="flex items-center gap-2 px-3 py-1 bg-purple-600 hover:bg-purple-500 text-white rounded transition relative"
@@ -759,13 +756,14 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
         />
       )}
 
-      {showAnnotationsList && (
-        <div 
-          className={`fixed top-[100px] right-0 w-[30%] max-h-[calc(100vh-100px)] overflow-hidden ${
-            activePanel === 'annotations' ? 'z-50' : 'z-40'
-          }`}
-          onClick={() => onSetActivePanel?.('annotations')}
-        >
+      <div 
+        className={`fixed top-[100px] right-0 w-[30%] max-h-[calc(100vh-100px)] overflow-hidden transition-opacity duration-200 ${
+          showAnnotationsList ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+        } ${
+          activePanel === 'annotations' ? 'z-50' : 'z-40'
+        }`}
+        onClick={() => onSetActivePanel?.('annotations')}
+      >
           <div className="bg-gray-900 rounded-lg shadow-2xl border border-gray-700">
             <div className="flex items-center justify-between p-4 border-b border-gray-700">
               <h3 className="text-white font-semibold">涂鸦列表</h3>
@@ -792,7 +790,7 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
             </div>
           </div>
         </div>
-      )}
+      </div>
 
       {showSettings && (
         <div className="fixed top-4 right-4 w-96 max-h-[calc(100vh-2rem)] z-50 flex flex-col">
