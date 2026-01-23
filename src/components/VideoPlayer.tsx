@@ -540,7 +540,6 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    // 立即设置两个状态
                     setShowAnnotationsList(true);
                     onSetActivePanel?.('annotations');
                   }}
@@ -764,8 +763,8 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
         }`}
         onClick={() => onSetActivePanel?.('annotations')}
       >
-        <div className="bg-gray-900 rounded-lg shadow-2xl border border-gray-700">
-          <div className="flex items-center justify-between p-4 border-b border-gray-700">
+        <div className="bg-gray-900 rounded-lg shadow-2xl border border-gray-700 h-full flex flex-col">
+          <div className="flex items-center justify-between p-4 border-b border-gray-700 flex-shrink-0">
             <h3 className="text-white font-semibold">涂鸦列表</h3>
             <button
               onClick={() => setShowAnnotationsList(false)}
@@ -774,21 +773,19 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
               <span className="text-xl">×</span>
             </button>
           </div>
-          <div className="p-4 max-h-[calc(100vh-8rem)] overflow-y-auto">
-            {showAnnotationsList && (
-              <AnnotationsList
-                annotations={annotations}
-                currentVideoUrl={videoId || ''}
-                onSeek={handleSeekToAnnotation}
-                onDelete={handleDeleteAnnotation}
-                videoElement={videoRef.current}
-                videoSegmentSettings={videoSegmentSettings}
-                videos={videos}
-                onSelectResult={onSelectResult || (() => {})}
-                isActive={activePanel === 'annotations'}
-                onFocus={() => onSetActivePanel?.('annotations')}
-              />
-            )}
+          <div className="p-4 flex-1 overflow-y-auto">
+            <AnnotationsList
+              annotations={annotations}
+              currentVideoUrl={videoId || ''}
+              onSeek={handleSeekToAnnotation}
+              onDelete={handleDeleteAnnotation}
+              videoElement={videoRef.current}
+              videoSegmentSettings={videoSegmentSettings}
+              videos={videos}
+              onSelectResult={onSelectResult || (() => {})}
+              isActive={activePanel === 'annotations'}
+              onFocus={() => onSetActivePanel?.('annotations')}
+            />
           </div>
         </div>
       </div>
