@@ -761,7 +761,7 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
 
       {showAnnotationsList && (
         <div 
-          className={`fixed top-[100px] right-4 w-[30vw] max-h-[calc(100vh-100px-2rem)] overflow-hidden ${
+          className={`fixed top-[100px] right-0 w-[30%] max-h-[calc(100vh-100px)] overflow-hidden ${
             activePanel === 'annotations' ? 'z-50' : 'z-40'
           }`}
           onClick={() => onSetActivePanel?.('annotations')}
