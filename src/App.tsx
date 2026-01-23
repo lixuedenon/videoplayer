@@ -823,7 +823,7 @@ function App() {
                 />
 
                 {showSearchDropdown && (
-                  <div className="absolute bottom-full left-0 mb-2 w-80 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50 p-4">
+                  <div className="absolute top-full left-0 mt-2 w-80 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50 p-4">
                     <div className="flex items-center justify-between mb-3">
                       <span className="text-white text-sm font-medium">搜索筛选</span>
                       <button
@@ -893,7 +893,7 @@ function App() {
               </div>
               <button
                 onClick={handleGlobalSearch}
-                disabled={!globalSearchQuery.trim()}
+                disabled={!globalSearchQuery.trim() && !durationFilter.enabled && !annotationCountFilter.enabled}
                 className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 搜索
