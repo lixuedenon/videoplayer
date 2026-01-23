@@ -757,24 +757,25 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
       )}
 
       <div 
-        className={`fixed top-[100px] right-0 w-[30%] max-h-[calc(100vh-100px)] overflow-hidden transition-opacity duration-200 ${
-          showAnnotationsList ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+        className={`fixed top-[100px] right-0 w-[30%] max-h-[calc(100vh-100px)] overflow-hidden ${
+          showAnnotationsList ? 'block' : 'hidden'
         } ${
           activePanel === 'annotations' ? 'z-50' : 'z-40'
         }`}
         onClick={() => onSetActivePanel?.('annotations')}
       >
-          <div className="bg-gray-900 rounded-lg shadow-2xl border border-gray-700">
-            <div className="flex items-center justify-between p-4 border-b border-gray-700">
-              <h3 className="text-white font-semibold">涂鸦列表</h3>
-              <button
-                onClick={() => setShowAnnotationsList(false)}
-                className="text-gray-400 hover:text-white transition"
-              >
-                <span className="text-xl">×</span>
-              </button>
-            </div>
-            <div className="p-4 max-h-[calc(100vh-8rem)] overflow-y-auto">
+        <div className="bg-gray-900 rounded-lg shadow-2xl border border-gray-700">
+          <div className="flex items-center justify-between p-4 border-b border-gray-700">
+            <h3 className="text-white font-semibold">涂鸦列表</h3>
+            <button
+              onClick={() => setShowAnnotationsList(false)}
+              className="text-gray-400 hover:text-white transition"
+            >
+              <span className="text-xl">×</span>
+            </button>
+          </div>
+          <div className="p-4 max-h-[calc(100vh-8rem)] overflow-y-auto">
+            {showAnnotationsList && (
               <AnnotationsList
                 annotations={annotations}
                 currentVideoUrl={videoId || ''}
@@ -787,9 +788,10 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
                 isActive={activePanel === 'annotations'}
                 onFocus={() => onSetActivePanel?.('annotations')}
               />
-            </div>
+            )}
           </div>
         </div>
+      </div>
 
       {showSettings && (
         <div className="fixed top-4 right-4 w-96 max-h-[calc(100vh-2rem)] z-50 flex flex-col">
