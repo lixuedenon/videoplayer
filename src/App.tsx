@@ -1,5 +1,8 @@
+// src/App.tsx
+// React组件 - 应用主组件，视频播放器的主界面和状态管理
+
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Folder, Link, SkipBack, SkipForward, FilePlus, Settings, Image as ImageIcon, Search } from 'lucide-react';
+import { Folder, Link, SkipBack, SkipForward, FilePlus, Settings, Image as ImageIcon, Search, ChevronUp } from 'lucide-react';
 import { VideoPlayer } from './components/VideoPlayer';
 import { Playlist } from './components/Playlist';
 import { AddUrlDialog } from './components/AddUrlDialog';
@@ -32,6 +35,18 @@ import {
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 
 type PlayMode = 'normal' | 'sequential' | 'random';
+type ActivePanel = 'search' | 'annotations' | null;
+
+interface DurationFilter {
+  enabled: boolean;
+  min: number;
+  max: number;
+}
+
+interface AnnotationCountFilter {
+  enabled: boolean;
+  count: number;
+}
 
 function App() {
   const [videos, setVideos] = useState<VideoFile[]>([]);
@@ -65,7 +80,6 @@ function App() {
     buttonStates
   } = useButtonCustomization();
 
-  // 缓存按钮显示数据，避免不必要的 VideoPlayer 重新渲染
   const playState = buttonStates.get('play');
   const forwardState = buttonStates.get('forward');
   const backwardState = buttonStates.get('backward');
@@ -105,6 +119,17 @@ function App() {
   const [globalSearchResults, setGlobalSearchResults] = useState<any[]>([]);
   const [isGlobalSearchOpen, setIsGlobalSearchOpen] = useState(false);
   const [isGlobalSearchExact, setIsGlobalSearchExact] = useState(false);
+  const [showSearchDropdown, setShowSearchDropdown] = useState(false);
+  const [durationFilter, setDurationFilter] = useState<DurationFilter>({
+    enabled: false,
+    min: 0,
+    max: 3600
+  });
+  const [annotationCountFilter, setAnnotationCountFilter] = useState<AnnotationCountFilter>({
+    enabled: false,
+    count: 0
+  });
+  const [activePanel, setActivePanel] = useState<ActivePanel>(null);
 
   const handleGlobalSearch = async () => {
     if (!globalSearchQuery.trim()) {
@@ -113,13 +138,25 @@ function App() {
       return;
     }
 
-    const results = await globalSearch(globalSearchQuery, videos, isGlobalSearchExact);
+    const results = await globalSearch(
+      globalSearchQuery,
+      videos,
+      isGlobalSearchExact,
+      durationFilter,
+      annotationCountFilter,
+      videoAnnotationCounts
+    );
     setGlobalSearchResults(results);
     setIsGlobalSearchOpen(true);
+    setActivePanel('search');
+    setShowSearchDropdown(false);
   };
 
   const handleCloseGlobalSearch = () => {
     setIsGlobalSearchOpen(false);
+    if (activePanel === 'search') {
+      setActivePanel(null);
+    }
   };
 
   const handleSelectSearchVideo = (video: VideoFile) => {
@@ -128,6 +165,7 @@ function App() {
       handleSelectVideo(index);
     }
     setIsGlobalSearchOpen(false);
+    setActivePanel(null);
   };
 
   const handleSelectSearchAnnotation = (videoUrl: string, timestamp: number) => {
@@ -141,6 +179,7 @@ function App() {
       }
     }
     setIsGlobalSearchOpen(false);
+    setActivePanel(null);
   };
 
   const handleTogglePlay = useCallback(() => {
@@ -346,7 +385,6 @@ function App() {
       fileInputRef.current?.click();
     }
   };
-
   const handleFileInputChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (files && files.length > 0) {
@@ -752,6 +790,10 @@ function App() {
                   type="text"
                   value={globalSearchQuery}
                   onChange={(e) => setGlobalSearchQuery(e.target.value)}
+                  onFocus={() => {
+                    setShowSearchDropdown(true);
+                    setActivePanel('search');
+                  }}
                   onKeyPress={(e) => {
                     if (e.key === 'Enter') {
                       handleGlobalSearch();
@@ -760,6 +802,75 @@ function App() {
                   placeholder="搜索视频、标注..."
                   className="bg-gray-800 text-white pl-10 pr-3 py-2 rounded-lg border border-gray-700 focus:border-blue-500 focus:outline-none text-sm w-64"
                 />
+
+                {showSearchDropdown && (
+                  <div className="absolute top-full left-0 mt-2 w-80 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50 p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-white text-sm font-medium">搜索筛选</span>
+                      <button
+                        onClick={() => setShowSearchDropdown(false)}
+                        className="text-gray-400 hover:text-white"
+                      >
+                        <ChevronUp size={16} />
+                      </button>
+                    </div>
+
+                    <div className="mb-4">
+                      <label className="flex items-center gap-2 mb-2">
+                        <input
+                          type="checkbox"
+                          checked={durationFilter.enabled}
+                          onChange={(e) => setDurationFilter({ ...durationFilter, enabled: e.target.checked })}
+                          className="rounded"
+                        />
+                        <span className="text-gray-300 text-sm">时长筛选（秒）</span>
+                      </label>
+                      {durationFilter.enabled && (
+                        <div className="flex items-center gap-2 ml-6">
+                          <input
+                            type="number"
+                            value={durationFilter.min}
+                            onChange={(e) => setDurationFilter({ ...durationFilter, min: Number(e.target.value) })}
+                            placeholder="最小"
+                            className="bg-gray-700 text-white px-2 py-1 rounded text-sm w-20"
+                          />
+                          <span className="text-gray-400">-</span>
+                          <input
+                            type="number"
+                            value={durationFilter.max}
+                            onChange={(e) => setDurationFilter({ ...durationFilter, max: Number(e.target.value) })}
+                            placeholder="最大"
+                            className="bg-gray-700 text-white px-2 py-1 rounded text-sm w-20"
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="mb-3">
+                      <label className="flex items-center gap-2 mb-2">
+                        <input
+                          type="checkbox"
+                          checked={annotationCountFilter.enabled}
+                          onChange={(e) => setAnnotationCountFilter({ ...annotationCountFilter, enabled: e.target.checked })}
+                          className="rounded"
+                        />
+                        <span className="text-gray-300 text-sm">标注数量</span>
+                      </label>
+                      {annotationCountFilter.enabled && (
+                        <div className="ml-6">
+                          <input
+                            type="number"
+                            value={annotationCountFilter.count}
+                            onChange={(e) => setAnnotationCountFilter({ ...annotationCountFilter, count: Number(e.target.value) })}
+                            placeholder="数量"
+                            className="bg-gray-700 text-white px-2 py-1 rounded text-sm w-20"
+                            min="0"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
               <button
                 onClick={handleGlobalSearch}
@@ -773,7 +884,7 @@ function App() {
                 className={`px-3 py-2 rounded-lg text-sm font-medium transition ${
                   isGlobalSearchExact
                     ? 'bg-blue-600 text-white'
-                    : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                    : 'bg-red-600 text-white hover:bg-red-500'
                 }`}
                 title={isGlobalSearchExact ? '精确匹配' : '模糊匹配'}
               >
@@ -925,6 +1036,8 @@ function App() {
               videos={videos}
               onSelectResult={handleSearchSelect}
               onAnnotationChange={loadAnnotationCounts}
+              activePanel={activePanel}
+              onSetActivePanel={setActivePanel}
             />
           </div>
         </div>
@@ -954,6 +1067,8 @@ function App() {
             onSelectVideo={handleSelectSearchVideo}
             onSelectAnnotation={handleSelectSearchAnnotation}
             searchQuery={globalSearchQuery}
+            isActive={activePanel === 'search'}
+            onFocus={() => setActivePanel('search')}
           />
         </div>
       </div>
