@@ -540,11 +540,10 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    const newState = !showAnnotationsList;
-                    setShowAnnotationsList(newState);
-                    if (newState) {
-                      onSetActivePanel?.('annotations');
+                    if (!showAnnotationsList) {
+                      setShowAnnotationsList(true);
                     }
+                    onSetActivePanel?.('annotations');
                   }}
                   className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg shadow-lg transition-all hover:scale-105 relative"
                   title="查看涂鸦列表"
@@ -691,11 +690,10 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
 
                   <button
                     onClick={() => {
-                      const newState = !showAnnotationsList;
-                      setShowAnnotationsList(newState);
-                      if (newState) {
-                        onSetActivePanel?.('annotations');
+                      if (!showAnnotationsList) {
+                        setShowAnnotationsList(true);
                       }
+                      onSetActivePanel?.('annotations');
                     }}
                     className="flex items-center gap-2 px-3 py-1 bg-purple-600 hover:bg-purple-500 text-white rounded transition relative"
                     title="涂鸦列表"
@@ -763,7 +761,7 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
 
       {showAnnotationsList && (
         <div 
-          className={`fixed top-4 right-4 w-[30vw] max-h-[calc(100vh-2rem)] overflow-hidden ${
+          className={`fixed top-[100px] right-4 w-[30vw] max-h-[calc(100vh-100px-2rem)] overflow-hidden ${
             activePanel === 'annotations' ? 'z-50' : 'z-40'
           }`}
           onClick={() => onSetActivePanel?.('annotations')}
