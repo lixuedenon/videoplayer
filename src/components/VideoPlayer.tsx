@@ -9,10 +9,15 @@ import {
   Maximize,
   Paintbrush,
   BookmarkIcon,
-  Settings
+  Settings,
+  Circle,
+  Square,
+  Mic,
+  MicOff
 } from 'lucide-react';
 import { CustomizableButton } from './CustomizableButton';
 import { ButtonShape } from '../types/buttonCustomization';
+import { ScreenRecorder, RecordingMode } from '../utils/screenRecorder';
 import { DrawingCanvas } from './DrawingCanvas';
 import { AnnotationsList } from './AnnotationsList';
 import { Annotation, DrawingData } from '../types/annotation';
@@ -97,6 +102,12 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [showDrawingCanvas, setShowDrawingCanvas] = useState(false);
   const [showAnnotationsList, setShowAnnotationsList] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingMode, setRecordingMode] = useState<RecordingMode>('player');
+  const [includeMicrophone, setIncludeMicrophone] = useState(true);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const recorderRef = useRef<ScreenRecorder>(new ScreenRecorder());
+  const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [replayBufferBefore, setReplayBufferBefore] = useState<number>(() => {
     const saved = localStorage.getItem('replayBufferBefore');
     return saved ? parseFloat(saved) : 10;
@@ -479,6 +490,61 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
     setShowSettings(false);
   };
 
+  // 录制相关函数
+  const startRecording = async () => {
+    try {
+      const canvas = document.querySelector('canvas');
+      
+      await recorderRef.current.startRecording({
+        mode: recordingMode,
+        includeMicrophone,
+        videoElement: videoRef.current,
+        canvasElement: canvas
+      });
+      
+      setIsRecording(true);
+      setRecordingTime(0);
+      
+      // 开始计时
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingTime(prev => prev + 1);
+      }, 1000);
+    } catch (error) {
+      console.error('启动录制失败:', error);
+      alert('录制失败，请确保授予了必要的权限');
+    }
+  };
+
+  const stopRecording = async () => {
+    try {
+      const blob = await recorderRef.current.stopRecording();
+      
+      // 停止计时
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+        recordingTimerRef.current = null;
+      }
+      
+      setIsRecording(false);
+      setRecordingTime(0);
+      
+      // 生成文件名
+      const timestamp = new Date().toISOString().replace(/:/g, '-').split('.')[0];
+      const filename = `recording_${timestamp}.webm`;
+      
+      // 下载录制的视频
+      await recorderRef.current.downloadRecording(blob, filename);
+    } catch (error) {
+      console.error('停止录制失败:', error);
+    }
+  };
+
+  const formatRecordingTime = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
   const handleMouseMove = () => {
     setShowControls(true);
     if (hideControlsTimer.current) {
@@ -538,6 +604,29 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
               >
                 <Paintbrush size={20} />
                 <span className="font-medium">涂鸦标注</span>
+              </button>
+
+              {/* 录制按钮 */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (isRecording) {
+                    stopRecording();
+                  } else {
+                    startRecording();
+                  }
+                }}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg shadow-lg transition-all hover:scale-105 ${
+                  isRecording 
+                    ? 'bg-red-600 hover:bg-red-500 animate-pulse' 
+                    : 'bg-green-600 hover:bg-green-500'
+                } text-white`}
+                title={isRecording ? '停止录制' : '开始录制'}
+              >
+                {isRecording ? <Square size={20} /> : <Circle size={20} />}
+                <span className="font-medium">
+                  {isRecording ? `录制中 ${formatRecordingTime(recordingTime)}` : '录制'}
+                </span>
               </button>
 
               {videoId && annotations.filter(a => a.video_url === videoId).length > 0 && (
@@ -1024,6 +1113,46 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
                   <li><strong>片段保存</strong>：点击涂鸦画布中紫色时钟按钮时，可设置保存片段的前后范围</li>
                   <li><strong>手动保存</strong>：橙色摄像机按钮可手动选择任意保存范围</li>
                 </ul>
+              </div>
+
+              {/* 录制设置 */}
+              <div className="pt-4 border-t border-gray-700">
+                <label className="text-white text-sm font-medium mb-3 block">
+                  录制设置
+                </label>
+                
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-gray-300 text-xs mb-2 block">录制模式</label>
+                    <select
+                      value={recordingMode}
+                      onChange={(e) => setRecordingMode(e.target.value as RecordingMode)}
+                      className="w-full bg-gray-700 text-white px-3 py-2 rounded text-sm"
+                    >
+                      <option value="player">播放器+涂鸦</option>
+                      <option value="screen">屏幕录制</option>
+                    </select>
+                    <p className="text-gray-400 text-xs mt-1">
+                      {recordingMode === 'player' 
+                        ? '录制播放器内容和涂鸦标注，适合制作教学视频' 
+                        : '录制整个屏幕或窗口，可录制YouTube等任意内容'}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="includeMic"
+                      checked={includeMicrophone}
+                      onChange={(e) => setIncludeMicrophone(e.target.checked)}
+                      className="w-4 h-4 rounded"
+                    />
+                    <label htmlFor="includeMic" className="text-gray-300 text-sm flex items-center gap-2">
+                      {includeMicrophone ? <Mic size={16} /> : <MicOff size={16} />}
+                      录制麦克风音频
+                    </label>
+                  </div>
+                </div>
               </div>
             </div>
 
