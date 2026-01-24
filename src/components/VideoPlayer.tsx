@@ -493,9 +493,22 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
   // 录制相关函数
   const startRecording = async () => {
     try {
+      // 查找canvas（涂鸦层），可能不存在
+      const canvas = document.querySelector('canvas') as HTMLCanvasElement | null;
+      
+      // 如果是播放器模式且没有canvas，提示用户
+      if (recordingMode === 'player' && !canvas) {
+        const continueWithoutCanvas = confirm(
+          '当前没有涂鸦标注。是否继续录制（仅录制视频画面）？\n\n' +
+          '提示：如果要录制涂鸦，请先点击"涂鸦标注"按钮添加标注。'
+        );
+        if (!continueWithoutCanvas) {
+          return;
+        }
+      }
+
       // 如果不需要麦克风，直接开始录制
       if (!includeMicrophone) {
-        const canvas = document.querySelector('canvas');
         await recorderRef.current.startRecording({
           mode: recordingMode,
           includeMicrophone: false,
@@ -514,7 +527,6 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
 
       // 需要麦克风时，先检查权限
       try {
-        const canvas = document.querySelector('canvas');
         await recorderRef.current.startRecording({
           mode: recordingMode,
           includeMicrophone: true,
@@ -533,7 +545,6 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
         if (micError.name === 'NotAllowedError' || micError.name === 'PermissionDeniedError') {
           const continueWithoutMic = confirm('麦克风权限被拒绝。是否继续录制（不包含麦克风音频）？');
           if (continueWithoutMic) {
-            const canvas = document.querySelector('canvas');
             await recorderRef.current.startRecording({
               mode: recordingMode,
               includeMicrophone: false,
