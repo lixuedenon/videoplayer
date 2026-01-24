@@ -19,6 +19,7 @@ import { CustomizableButton } from './CustomizableButton';
 import { ButtonShape } from '../types/buttonCustomization';
 import { ScreenRecorder, RecordingMode } from '../utils/screenRecorder';
 import { DrawingCanvas } from './DrawingCanvas';
+import { LiveDrawingOverlay } from './LiveDrawingOverlay';
 import { AnnotationsList } from './AnnotationsList';
 import { Annotation, DrawingData } from '../types/annotation';
 import { saveAnnotation, getAnnotations, deleteAnnotation, getVideoSegmentSettings, saveVideoSegmentSettings } from '../utils/database';
@@ -101,6 +102,7 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
   const previousVideoUrlRef = useRef<string>('');
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [showDrawingCanvas, setShowDrawingCanvas] = useState(false);
+  const [showLiveDrawing, setShowLiveDrawing] = useState(false);
   const [showAnnotationsList, setShowAnnotationsList] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingMode, setRecordingMode] = useState<RecordingMode>('player');
@@ -683,6 +685,29 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
                 </span>
               </button>
 
+              {/* 实时涂鸦按钮 - 播放时也可用 */}
+            </div>
+          )}
+
+          {/* 实时涂鸦按钮 - 独立显示，播放时可用 */}
+          {!showDrawingCanvas && (
+            <div className="absolute top-4 right-4 z-20">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowLiveDrawing(!showLiveDrawing);
+                }}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg shadow-lg transition-all hover:scale-105 ${
+                  showLiveDrawing 
+                    ? 'bg-orange-600 hover:bg-orange-500' 
+                    : 'bg-purple-600 hover:bg-purple-500'
+                } text-white`}
+                title={showLiveDrawing ? '关闭实时涂鸦' : '开启实时涂鸦'}
+              >
+                <Paintbrush size={20} />
+                <span className="font-medium">{showLiveDrawing ? '涂鸦中' : '实时涂鸦'}</span>
+              </button>
+
               {videoId && annotations.filter(a => a.video_url === videoId).length > 0 && (
                 <button
                   onClick={(e) => {
@@ -918,6 +943,13 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
           videoName={videoUrl.split('/').pop() || 'video'}
         />
       )}
+
+      {/* 实时涂鸦覆盖层 */}
+      <LiveDrawingOverlay
+        videoElement={videoRef.current}
+        isActive={showLiveDrawing}
+        onClose={() => setShowLiveDrawing(false)}
+      />
 
       {showAnnotationsList && (
         <div 
