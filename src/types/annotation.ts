@@ -37,11 +37,31 @@ export interface DrawingData {
   canvasHeight: number;
 }
 
+// 动态涂鸦的时间轴笔画
+export interface LiveStroke {
+  tool: 'pen' | 'eraser';
+  color: string;
+  width: number;
+  points: Point[];
+  startTime: number;  // 相对于标注开始的时间（秒）
+  endTime: number;    // 笔画完成时间
+}
+
+// 动态涂鸦数据
+export interface LiveDrawingData {
+  strokes: LiveStroke[];
+  duration: number;  // 总时长
+  canvasWidth: number;
+  canvasHeight: number;
+}
+
 export interface Annotation {
   id: string;
   video_url: string;
   timestamp: number;
   drawing_data: DrawingData;
+  live_drawing_data?: LiveDrawingData;  // 动态涂鸦数据
+  is_live?: boolean;  // 是否为动态涂鸦
   thumbnail?: string;
   name?: string;
   text_content?: string;
