@@ -103,7 +103,8 @@ export const saveAnnotation = async (
   drawingData: DrawingData,
   thumbnail: string,
   name?: string,
-  textContent?: string
+  textContent?: string,
+  liveDrawingData?: any
 ): Promise<Annotation | null> => {
   try {
     const annotation = await indexedDB.addAnnotation({
@@ -112,7 +113,9 @@ export const saveAnnotation = async (
       drawing_data: drawingData,
       thumbnail,
       name: name || null,
-      text_content: textContent || null
+      text_content: textContent || null,
+      live_drawing_data: liveDrawingData || null,
+      is_live: !!liveDrawingData
     });
 
     return annotation;
