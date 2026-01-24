@@ -1058,6 +1058,8 @@ function App() {
               onAnnotationChange={loadAnnotationCounts}
               activePanel={activePanel}
               onSetActivePanel={setActivePanel}
+              isSearchPanelOpen={isGlobalSearchOpen}
+              onCloseSearchPanel={handleCloseGlobalSearch}
             />
           </div>
         </div>
