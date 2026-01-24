@@ -482,11 +482,21 @@ export const AnnotationsList: React.FC<AnnotationsListProps> = ({
                 {annotation.name && (
                   <div className="text-white font-medium text-sm mb-1 truncate" title={annotation.name}>
                     {annotation.name}
+                    {annotation.is_live && (
+                      <span className="ml-2 px-2 py-0.5 bg-orange-600 text-white text-xs rounded">
+                        实时涂鸦
+                      </span>
+                    )}
                   </div>
                 )}
                 <div className="flex items-center justify-between">
                   <span className="text-gray-300 text-sm">
                     {formatTime(annotation.timestamp)}
+                    {annotation.is_live && annotation.live_drawing_data && (
+                      <span className="ml-1 text-gray-400 text-xs">
+                        ({annotation.live_drawing_data.duration.toFixed(1)}秒)
+                      </span>
+                    )}
                   </span>
                   <span className="text-gray-400 text-xs">
                     {new Date(annotation.created_at).toLocaleDateString()}
