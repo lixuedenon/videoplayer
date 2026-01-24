@@ -80,6 +80,8 @@ export const SearchResultsPanel: React.FC<SearchResultsPanelProps> = ({
   isActive = true,
   onFocus
 }) => {
+  if (!isVisible) return null;
+
   const formatTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
@@ -113,8 +115,6 @@ export const SearchResultsPanel: React.FC<SearchResultsPanelProps> = ({
   return (
     <div 
       className={`absolute top-0 right-0 w-full h-full bg-gray-900 rounded-lg shadow-2xl border border-gray-700 flex flex-col overflow-hidden ${
-        isVisible ? 'block' : 'hidden'
-      } ${
         isActive ? 'z-50' : 'z-40'
       }`}
       onClick={onFocus}
