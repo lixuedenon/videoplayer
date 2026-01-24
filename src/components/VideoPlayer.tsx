@@ -493,25 +493,68 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
   // 录制相关函数
   const startRecording = async () => {
     try {
-      const canvas = document.querySelector('canvas');
-      
-      await recorderRef.current.startRecording({
-        mode: recordingMode,
-        includeMicrophone,
-        videoElement: videoRef.current,
-        canvasElement: canvas
-      });
-      
-      setIsRecording(true);
-      setRecordingTime(0);
-      
-      // 开始计时
-      recordingTimerRef.current = setInterval(() => {
-        setRecordingTime(prev => prev + 1);
-      }, 1000);
-    } catch (error) {
+      // 如果不需要麦克风，直接开始录制
+      if (!includeMicrophone) {
+        const canvas = document.querySelector('canvas');
+        await recorderRef.current.startRecording({
+          mode: recordingMode,
+          includeMicrophone: false,
+          videoElement: videoRef.current,
+          canvasElement: canvas
+        });
+        
+        setIsRecording(true);
+        setRecordingTime(0);
+        
+        recordingTimerRef.current = setInterval(() => {
+          setRecordingTime(prev => prev + 1);
+        }, 1000);
+        return;
+      }
+
+      // 需要麦克风时，先检查权限
+      try {
+        const canvas = document.querySelector('canvas');
+        await recorderRef.current.startRecording({
+          mode: recordingMode,
+          includeMicrophone: true,
+          videoElement: videoRef.current,
+          canvasElement: canvas
+        });
+        
+        setIsRecording(true);
+        setRecordingTime(0);
+        
+        recordingTimerRef.current = setInterval(() => {
+          setRecordingTime(prev => prev + 1);
+        }, 1000);
+      } catch (micError: any) {
+        // 如果用户拒绝麦克风权限，提示是否继续不录制麦克风
+        if (micError.name === 'NotAllowedError' || micError.name === 'PermissionDeniedError') {
+          const continueWithoutMic = confirm('麦克风权限被拒绝。是否继续录制（不包含麦克风音频）？');
+          if (continueWithoutMic) {
+            const canvas = document.querySelector('canvas');
+            await recorderRef.current.startRecording({
+              mode: recordingMode,
+              includeMicrophone: false,
+              videoElement: videoRef.current,
+              canvasElement: canvas
+            });
+            
+            setIsRecording(true);
+            setRecordingTime(0);
+            
+            recordingTimerRef.current = setInterval(() => {
+              setRecordingTime(prev => prev + 1);
+            }, 1000);
+          }
+        } else {
+          throw micError;
+        }
+      }
+    } catch (error: any) {
       console.error('启动录制失败:', error);
-      alert('录制失败，请确保授予了必要的权限');
+      alert(`录制失败: ${error.message || '未知错误'}`);
     }
   };
 
