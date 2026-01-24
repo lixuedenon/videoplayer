@@ -1,10 +1,16 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Paintbrush, Eraser, Trash2, Undo, Square } from 'lucide-react';
+import { Paintbrush, Eraser, Trash2, Undo, Square, Save } from 'lucide-react';
 
 interface LiveDrawingOverlayProps {
   videoElement: HTMLVideoElement | null;
   isActive: boolean;
   onClose: () => void;
+  onSave?: (data: {
+    strokes: Stroke[];
+    startTimestamp: number;
+    duration: number;
+    thumbnail: string;
+  }) => void;
 }
 
 type DrawingTool = 'pen' | 'eraser';
@@ -19,12 +25,15 @@ interface Stroke {
   color: string;
   width: number;
   points: Point[];
+  startTime: number;  // 相对时间（秒）
+  endTime: number;
 }
 
 export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
   videoElement,
   isActive,
-  onClose
+  onClose,
+  onSave
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -33,6 +42,15 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
   const [penWidth, setPenWidth] = useState(3);
   const [strokes, setStrokes] = useState<Stroke[]>([]);
   const [currentStroke, setCurrentStroke] = useState<Point[]>([]);
+  const [startTimestamp, setStartTimestamp] = useState<number>(0);
+  const [currentStrokeStartTime, setCurrentStrokeStartTime] = useState<number>(0);
+
+  // 初始化开始时间
+  useEffect(() => {
+    if (isActive && videoElement) {
+      setStartTimestamp(videoElement.currentTime);
+    }
+  }, [isActive, videoElement]);
 
   // 初始化canvas
   useEffect(() => {
@@ -109,6 +127,11 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
     setIsDrawing(true);
     const point = getCanvasCoordinates(e);
     setCurrentStroke([point]);
+    
+    // 记录笔画开始时间（相对于标注开始时间）
+    if (videoElement) {
+      setCurrentStrokeStartTime(videoElement.currentTime - startTimestamp);
+    }
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -151,12 +174,16 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
 
     setIsDrawing(false);
 
-    if (currentStroke.length > 1) {
+    if (currentStroke.length > 1 && videoElement) {
+      const endTime = videoElement.currentTime - startTimestamp;
+      
       const newStroke: Stroke = {
         tool: currentTool,
         color: penColor,
         width: penWidth,
-        points: currentStroke
+        points: currentStroke,
+        startTime: currentStrokeStartTime,
+        endTime: endTime
       };
 
       setStrokes([...strokes, newStroke]);
@@ -174,6 +201,95 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
     if (!ctx) return;
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+  };
+
+  const handleUndo = () => {
+    if (strokes.length === 0) return;
+
+    const newStrokes = strokes.slice(0, -1);
+    setStrokes(newStrokes);
+
+    // 重绘
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    newStrokes.forEach(stroke => {
+      if (stroke.points.length < 2) return;
+
+      ctx.strokeStyle = stroke.color;
+      ctx.lineWidth = stroke.width;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      if (stroke.tool === 'eraser') {
+        ctx.globalCompositeOperation = 'destination-out';
+      } else {
+        ctx.globalCompositeOperation = 'source-over';
+      }
+
+      ctx.beginPath();
+      ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+
+      for (let i = 1; i < stroke.points.length; i++) {
+        ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
+      }
+
+      ctx.stroke();
+    });
+
+    ctx.globalCompositeOperation = 'source-over';
+  };
+
+  // 生成缩略图
+  const generateThumbnail = (): string => {
+    if (!canvasRef.current || !videoElement) return '';
+
+    // 创建临时canvas合成视频帧+涂鸦
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = videoElement.videoWidth || 1280;
+    tempCanvas.height = videoElement.videoHeight || 720;
+    const ctx = tempCanvas.getContext('2d');
+    
+    if (!ctx) return '';
+
+    // 绘制当前视频帧
+    ctx.drawImage(videoElement, 0, 0, tempCanvas.width, tempCanvas.height);
+    
+    // 绘制涂鸦层
+    const canvas = canvasRef.current;
+    ctx.drawImage(canvas, 0, 0, tempCanvas.width, tempCanvas.height);
+    
+    // 转为base64
+    return tempCanvas.toDataURL('image/jpeg', 0.8);
+  };
+
+  // 保存标注
+  const handleSave = () => {
+    if (strokes.length === 0) {
+      alert('还没有涂鸦内容');
+      return;
+    }
+
+    if (!videoElement) return;
+
+    const duration = videoElement.currentTime - startTimestamp;
+    const thumbnail = generateThumbnail();
+
+    onSave?.({
+      strokes,
+      startTimestamp,
+      duration,
+      thumbnail
+    });
+
+    // 保存后清空
+    handleClear();
+    onClose();
   };
 
   const handleUndo = () => {
@@ -318,6 +434,16 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
         </div>
 
         <div className="w-px h-6 bg-gray-600"></div>
+
+        {/* 保存标注 */}
+        <button
+          onClick={handleSave}
+          disabled={strokes.length === 0}
+          className="p-2 rounded bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition"
+          title="保存标注"
+        >
+          <Save size={20} />
+        </button>
 
         {/* 关闭 */}
         <button
