@@ -956,7 +956,7 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
 
       {showSettings && (
         <div className="fixed top-4 right-4 w-96 max-h-[calc(100vh-2rem)] z-50 flex flex-col">
-          <div className="bg-gray-900 rounded-lg shadow-2xl border border-gray-700 flex flex-col max-h-full">
+          <div className="bg-gray-900 rounded-lg shadow-2xl border border-gray-700 flex flex-col h-full max-h-full">
             <div className="flex items-center justify-between p-4 border-b border-gray-700 flex-shrink-0">
               <h3 className="text-white font-semibold flex items-center gap-2">
                 <Settings size={18} />
@@ -969,7 +969,7 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
                 <span className="text-xl">×</span>
               </button>
             </div>
-            <div className="p-4 space-y-6 overflow-y-auto flex-1">
+            <div className="p-4 space-y-6 overflow-y-auto flex-1 min-h-0">
               {/* 录制设置 - 移到顶部 */}
               <div className="pb-4 border-b border-gray-700">
                 <label className="text-white text-sm font-medium mb-3 block">
