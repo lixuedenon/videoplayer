@@ -83,8 +83,15 @@ export async function addAnnotation(annotation: IndexedDBAnnotation): Promise<An
   const created_at = new Date().toISOString();
 
   const fullAnnotation: Annotation = {
-    ...annotation,
     id,
+    video_url: annotation.video_url,
+    timestamp: annotation.timestamp,
+    drawing_data: annotation.drawing_data,
+    thumbnail: annotation.thumbnail,
+    name: annotation.name ?? undefined,
+    text_content: annotation.text_content ?? undefined,
+    live_drawing_data: annotation.live_drawing_data ?? undefined,
+    is_live: annotation.is_live ?? undefined,
     created_at
   };
 
