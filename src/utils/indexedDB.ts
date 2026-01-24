@@ -2,7 +2,7 @@ import { Annotation } from '../types/annotation';
 import { VideoSegment } from '../types/videoSegment';
 
 const DB_NAME = 'VideoAnnotationDB';
-const DB_VERSION = 1;
+const DB_VERSION = 2;  // 升级到版本2，支持动态涂鸦
 const ANNOTATIONS_STORE = 'annotations';
 const VIDEO_SEGMENTS_STORE = 'video_segments';
 
@@ -39,7 +39,10 @@ export async function initDB(): Promise<IDBDatabase> {
 
     request.onupgradeneeded = (event) => {
       const db = (event.target as IDBOpenDBRequest).result;
+      const transaction = (event.target as IDBOpenDBRequest).transaction!;
+      const oldVersion = event.oldVersion;
 
+      // 创建annotations store（首次安装）
       if (!db.objectStoreNames.contains(ANNOTATIONS_STORE)) {
         const annotationsStore = db.createObjectStore(ANNOTATIONS_STORE, {
           keyPath: 'id',
@@ -50,6 +53,15 @@ export async function initDB(): Promise<IDBDatabase> {
         annotationsStore.createIndex('name', 'name', { unique: false });
         annotationsStore.createIndex('text_content', 'text_content', { unique: false });
         annotationsStore.createIndex('created_at', 'created_at', { unique: false });
+        annotationsStore.createIndex('is_live', 'is_live', { unique: false });
+      } 
+      // 版本升级：从1到2，添加动态涂鸦支持
+      else if (oldVersion < 2) {
+        const annotationsStore = transaction.objectStore(ANNOTATIONS_STORE);
+        // 添加is_live索引（如果不存在）
+        if (!annotationsStore.indexNames.contains('is_live')) {
+          annotationsStore.createIndex('is_live', 'is_live', { unique: false });
+        }
       }
 
       if (!db.objectStoreNames.contains(VIDEO_SEGMENTS_STORE)) {
