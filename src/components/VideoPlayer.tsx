@@ -435,11 +435,19 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
     duration: number;
     thumbnail: string;
   }) => {
-    if (!videoId || !videoRef.current) return;
+    console.log('开始保存实时涂鸦', data);
+    
+    if (!videoId || !videoRef.current) {
+      console.error('缺少videoId或videoRef');
+      return;
+    }
 
-    const canvas = canvasRef.current || document.querySelector('canvas');
-    const canvasWidth = canvas?.width || 1280;
-    const canvasHeight = canvas?.height || 720;
+    // 从LiveDrawingOverlay的canvas获取尺寸
+    const liveCanvas = document.querySelector('canvas');
+    const canvasWidth = liveCanvas?.width || videoRef.current.videoWidth || 1280;
+    const canvasHeight = liveCanvas?.height || videoRef.current.videoHeight || 720;
+
+    console.log('Canvas尺寸:', canvasWidth, 'x', canvasHeight);
 
     // 转换为LiveDrawingData格式
     const liveDrawingData = {
@@ -455,6 +463,8 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
       canvasWidth,
       canvasHeight
     };
+
+    console.log('LiveDrawingData:', liveDrawingData);
 
     // 创建一个空的DrawingData（兼容现有数据结构）
     const drawingData: DrawingData = {
@@ -493,37 +503,30 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
 
         if (filePath) {
           finalThumbnail = filePath;
+          console.log('缩略图已保存:', filePath);
         }
       } catch (error) {
         console.error('Failed to save thumbnail:', error);
       }
     }
 
-    // 保存到数据库（添加is_live和live_drawing_data字段）
-    const annotation: any = {
-      id: `live_${Date.now()}`,
-      video_url: videoId,
-      timestamp: data.startTimestamp,
-      drawing_data: drawingData,
-      live_drawing_data: liveDrawingData,
-      is_live: true,
-      thumbnail: finalThumbnail,
-      name: `实时涂鸦 ${new Date().toLocaleTimeString()}`,
-      created_at: new Date().toISOString()
-    };
-
     try {
-      await saveAnnotation(
+      console.log('调用saveAnnotation...');
+      const result = await saveAnnotation(
         videoId,
         data.startTimestamp,
         drawingData,
         finalThumbnail,
-        annotation.name,
+        `实时涂鸦 ${new Date().toLocaleTimeString()}`,
         '',
         liveDrawingData  // 传递动态涂鸦数据
       );
 
+      console.log('保存结果:', result);
+
       const updatedAnnotations = await getAnnotations();
+      console.log('更新后的标注列表:', updatedAnnotations);
+      
       setAnnotations(updatedAnnotations);
       
       if (onAnnotationChange) {
@@ -533,7 +536,74 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
       alert('实时涂鸦已保存！');
     } catch (error) {
       console.error('Failed to save live drawing:', error);
-      alert('保存失败');
+      alert(`保存失败: ${error}`);
+    }
+  };
+
+  const handleSaveAnnotation = async (drawingData: DrawingData, thumbnail: string, name: string, saveType?: 'annotation' | 'screenshot' | 'video-segment' | 'timestamp') => {
+    if (!videoId || !videoRef.current) return;
+
+    const timestamp = videoRef.current.currentTime;
+    const videoName = videoId.split('/').pop() || 'video';
+
+    if (saveType === 'screenshot') {
+      console.log('Screenshot saved');
+      return;
+    }
+
+    if (saveType === 'timestamp') {
+      console.log('Timestamp saved:', timestamp);
+      return;
+    }
+
+    if (saveType === 'video-segment') {
+      console.log('Video segment save requested at:', timestamp);
+      alert(`视频段保存功能需要配置起始和结束时间点\n当前时间：${timestamp.toFixed(2)}秒`);
+      return;
+    }
+
+    const textContent = extractTextFromDrawingData(drawingData);
+
+    let filePath: string | null = null;
+    let finalThumbnail = thumbnail;
+
+    if (await checkFileSystemSupport()) {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = drawingData.canvasWidth;
+        canvas.height = drawingData.canvasHeight;
+        const ctx = canvas.getContext('2d');
+
+        if (ctx) {
+          const img = new Image();
+          img.src = thumbnail;
+          await new Promise((resolve) => {
+            img.onload = resolve;
+          });
+          ctx.drawImage(img, 0, 0);
+        }
+
+        const blob = await new Promise<Blob>((resolve) => {
+          canvas.toBlob((b) => resolve(b!), 'image/png', 1.0);
+        });
+
+        filePath = await saveScreenshot(videoName, timestamp, blob);
+
+        if (filePath) {
+          finalThumbnail = filePath;
+          console.log('Screenshot saved to local file system:', filePath);
+        }
+      } catch (error) {
+        console.error('Failed to save screenshot to file system, using base64:', error);
+      }
+    }
+
+    const annotation = await saveAnnotation(videoId, timestamp, drawingData, finalThumbnail, name, textContent);
+
+    if (annotation) {
+      setAnnotations(prev => [...prev, annotation]);
+      setShowDrawingCanvas(false);
+      onAnnotationChange?.();
     }
   };
 
