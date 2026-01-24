@@ -419,6 +419,185 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
     const annotation = await saveAnnotation(videoId, timestamp, drawingData, finalThumbnail, name, textContent);
 
     if (annotation) {
+      const updatedAnnotations = await getAnnotations();
+      setAnnotations(updatedAnnotations);
+      setShowDrawingCanvas(false);
+      if (onAnnotationChange) {
+        onAnnotationChange();
+      }
+    }
+  };
+
+  // 保存动态涂鸦
+  const handleSaveLiveDrawing = async (data: {
+    strokes: any[];
+    startTimestamp: number;
+    duration: number;
+    thumbnail: string;
+  }) => {
+    if (!videoId || !videoRef.current) return;
+
+    const canvas = canvasRef.current || document.querySelector('canvas');
+    const canvasWidth = canvas?.width || 1280;
+    const canvasHeight = canvas?.height || 720;
+
+    // 转换为LiveDrawingData格式
+    const liveDrawingData = {
+      strokes: data.strokes.map(stroke => ({
+        tool: stroke.tool,
+        color: stroke.color,
+        width: stroke.width,
+        points: stroke.points,
+        startTime: stroke.startTime,
+        endTime: stroke.endTime
+      })),
+      duration: data.duration,
+      canvasWidth,
+      canvasHeight
+    };
+
+    // 创建一个空的DrawingData（兼容现有数据结构）
+    const drawingData: DrawingData = {
+      elements: [],
+      canvasWidth,
+      canvasHeight
+    };
+
+    const videoName = videoId.split('/').pop() || 'video';
+    let filePath: string | null = null;
+    let finalThumbnail = data.thumbnail;
+
+    // 保存缩略图到文件系统
+    if (await checkFileSystemSupport()) {
+      try {
+        const img = new Image();
+        img.src = data.thumbnail;
+        await new Promise((resolve) => {
+          img.onload = resolve;
+        });
+
+        const canvas = document.createElement('canvas');
+        canvas.width = canvasWidth;
+        canvas.height = canvasHeight;
+        const ctx = canvas.getContext('2d');
+        
+        if (ctx) {
+          ctx.drawImage(img, 0, 0);
+        }
+
+        const blob = await new Promise<Blob>((resolve) => {
+          canvas.toBlob((b) => resolve(b!), 'image/png', 1.0);
+        });
+
+        filePath = await saveScreenshot(videoName, data.startTimestamp, blob);
+
+        if (filePath) {
+          finalThumbnail = filePath;
+        }
+      } catch (error) {
+        console.error('Failed to save thumbnail:', error);
+      }
+    }
+
+    // 保存到数据库（添加is_live和live_drawing_data字段）
+    const annotation: any = {
+      id: `live_${Date.now()}`,
+      video_url: videoId,
+      timestamp: data.startTimestamp,
+      drawing_data: drawingData,
+      live_drawing_data: liveDrawingData,
+      is_live: true,
+      thumbnail: finalThumbnail,
+      name: `实时涂鸦 ${new Date().toLocaleTimeString()}`,
+      created_at: new Date().toISOString()
+    };
+
+    try {
+      await saveAnnotation(
+        videoId,
+        data.startTimestamp,
+        drawingData,
+        finalThumbnail,
+        annotation.name,
+        '',
+        liveDrawingData  // 传递动态涂鸦数据
+      );
+
+      const updatedAnnotations = await getAnnotations();
+      setAnnotations(updatedAnnotations);
+      
+      if (onAnnotationChange) {
+        onAnnotationChange();
+      }
+
+      alert('实时涂鸦已保存！');
+    } catch (error) {
+      console.error('Failed to save live drawing:', error);
+      alert('保存失败');
+    }
+  };
+
+  const handleSaveAnnotation = async (drawingData: DrawingData, thumbnail: string, name: string, saveType?: 'annotation' | 'screenshot' | 'video-segment' | 'timestamp') => {
+    if (!videoId || !videoRef.current) return;
+
+    const timestamp = videoRef.current.currentTime;
+    const videoName = videoId.split('/').pop() || 'video';
+
+    if (saveType === 'screenshot') {
+      console.log('Screenshot saved');
+      return;
+    }
+
+    if (saveType === 'timestamp') {
+      console.log('Timestamp saved:', timestamp);
+      return;
+    }
+
+    if (saveType === 'video-segment') {
+      console.log('Video segment save requested at:', timestamp);
+      alert(`视频段保存功能需要配置起始和结束时间点\n当前时间：${timestamp.toFixed(2)}秒`);
+      return;
+    }
+
+    const textContent = extractTextFromDrawingData(drawingData);
+
+    let filePath: string | null = null;
+    let finalThumbnail = thumbnail;
+
+    if (await checkFileSystemSupport()) {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = drawingData.canvasWidth;
+        canvas.height = drawingData.canvasHeight;
+        const ctx = canvas.getContext('2d');
+
+        if (ctx) {
+          const img = new Image();
+          img.src = thumbnail;
+          await new Promise((resolve) => {
+            img.onload = resolve;
+          });
+          ctx.drawImage(img, 0, 0);
+        }
+
+        const blob = await new Promise<Blob>((resolve) => {
+          canvas.toBlob((b) => resolve(b!), 'image/png', 1.0);
+        });
+
+        filePath = await saveScreenshot(videoName, timestamp, blob);
+
+        if (filePath) {
+          finalThumbnail = filePath;
+          console.log('Screenshot saved to local file system:', filePath);
+        }
+      } catch (error) {
+        console.error('Failed to save screenshot to file system, using base64:', error);
+      }
+    }
+
+    const annotation = await saveAnnotation(videoId, timestamp, drawingData, finalThumbnail, name, textContent);
+
+    if (annotation) {
       setAnnotations(prev => [...prev, annotation]);
       setShowDrawingCanvas(false);
       onAnnotationChange?.();
@@ -677,7 +856,11 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
                     ? 'bg-red-600 hover:bg-red-500 animate-pulse' 
                     : 'bg-green-600 hover:bg-green-500'
                 } text-white`}
-                title={isRecording ? '停止录制' : '开始录制'}
+                title={
+                  isRecording 
+                    ? '停止录制' 
+                    : `开始录制 (${recordingMode === 'player' ? '播放器+涂鸦' : '屏幕录制'})`
+                }
               >
                 {isRecording ? <Square size={20} /> : <Circle size={20} />}
                 <span className="font-medium">
@@ -949,6 +1132,7 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
         videoElement={videoRef.current}
         isActive={showLiveDrawing}
         onClose={() => setShowLiveDrawing(false)}
+        onSave={handleSaveLiveDrawing}
       />
 
       {showAnnotationsList && (
