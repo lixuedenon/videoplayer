@@ -104,7 +104,7 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
   const [showAnnotationsList, setShowAnnotationsList] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingMode, setRecordingMode] = useState<RecordingMode>('player');
-  const [includeMicrophone, setIncludeMicrophone] = useState(true);
+  const [includeMicrophone, setIncludeMicrophone] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const recorderRef = useRef<ScreenRecorder>(new ScreenRecorder());
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -970,6 +970,46 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
               </button>
             </div>
             <div className="p-4 space-y-6 overflow-y-auto flex-1">
+              {/* 录制设置 - 移到顶部 */}
+              <div className="pb-4 border-b border-gray-700">
+                <label className="text-white text-sm font-medium mb-3 block">
+                  录制设置
+                </label>
+                
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-gray-300 text-xs mb-2 block">录制模式</label>
+                    <select
+                      value={recordingMode}
+                      onChange={(e) => setRecordingMode(e.target.value as RecordingMode)}
+                      className="w-full bg-gray-700 text-white px-3 py-2 rounded text-sm"
+                    >
+                      <option value="player">播放器+涂鸦</option>
+                      <option value="screen">屏幕录制</option>
+                    </select>
+                    <p className="text-gray-400 text-xs mt-1">
+                      {recordingMode === 'player' 
+                        ? '录制播放器内容和涂鸦标注，适合制作教学视频' 
+                        : '录制整个屏幕或窗口，可录制YouTube等任意内容'}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="includeMic"
+                      checked={includeMicrophone}
+                      onChange={(e) => setIncludeMicrophone(e.target.checked)}
+                      className="w-4 h-4 rounded"
+                    />
+                    <label htmlFor="includeMic" className="text-gray-300 text-sm flex items-center gap-2">
+                      {includeMicrophone ? <Mic size={16} /> : <MicOff size={16} />}
+                      录制麦克风音频
+                    </label>
+                  </div>
+                </div>
+              </div>
+
               <div>
                 <label className="text-white text-sm font-medium mb-2 block">
                   涂鸦回放缓冲设置
@@ -1167,46 +1207,6 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
                   <li><strong>片段保存</strong>：点击涂鸦画布中紫色时钟按钮时，可设置保存片段的前后范围</li>
                   <li><strong>手动保存</strong>：橙色摄像机按钮可手动选择任意保存范围</li>
                 </ul>
-              </div>
-
-              {/* 录制设置 */}
-              <div className="pt-4 border-t border-gray-700">
-                <label className="text-white text-sm font-medium mb-3 block">
-                  录制设置
-                </label>
-                
-                <div className="space-y-3">
-                  <div>
-                    <label className="text-gray-300 text-xs mb-2 block">录制模式</label>
-                    <select
-                      value={recordingMode}
-                      onChange={(e) => setRecordingMode(e.target.value as RecordingMode)}
-                      className="w-full bg-gray-700 text-white px-3 py-2 rounded text-sm"
-                    >
-                      <option value="player">播放器+涂鸦</option>
-                      <option value="screen">屏幕录制</option>
-                    </select>
-                    <p className="text-gray-400 text-xs mt-1">
-                      {recordingMode === 'player' 
-                        ? '录制播放器内容和涂鸦标注，适合制作教学视频' 
-                        : '录制整个屏幕或窗口，可录制YouTube等任意内容'}
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id="includeMic"
-                      checked={includeMicrophone}
-                      onChange={(e) => setIncludeMicrophone(e.target.checked)}
-                      className="w-4 h-4 rounded"
-                    />
-                    <label htmlFor="includeMic" className="text-gray-300 text-sm flex items-center gap-2">
-                      {includeMicrophone ? <Mic size={16} /> : <MicOff size={16} />}
-                      录制麦克风音频
-                    </label>
-                  </div>
-                </div>
               </div>
             </div>
 
