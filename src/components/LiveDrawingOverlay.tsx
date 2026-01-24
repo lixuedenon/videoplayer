@@ -292,48 +292,6 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
     onClose();
   };
 
-  const handleUndo = () => {
-    if (strokes.length === 0) return;
-
-    const newStrokes = strokes.slice(0, -1);
-    setStrokes(newStrokes);
-
-    // 重绘
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    newStrokes.forEach(stroke => {
-      if (stroke.points.length < 2) return;
-
-      ctx.strokeStyle = stroke.color;
-      ctx.lineWidth = stroke.width;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-
-      if (stroke.tool === 'eraser') {
-        ctx.globalCompositeOperation = 'destination-out';
-      } else {
-        ctx.globalCompositeOperation = 'source-over';
-      }
-
-      ctx.beginPath();
-      ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
-
-      for (let i = 1; i < stroke.points.length; i++) {
-        ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
-      }
-
-      ctx.stroke();
-    });
-
-    ctx.globalCompositeOperation = 'source-over';
-  };
-
   if (!isActive) return null;
 
   const colors = ['#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF', '#FFFFFF', '#000000'];
