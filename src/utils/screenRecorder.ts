@@ -74,8 +74,8 @@ export class ScreenRecorder {
   private async startPlayerRecording(options: RecordingOptions): Promise<void> {
     const { videoElement, canvasElement, includeMicrophone } = options;
 
-    if (!videoElement || !canvasElement) {
-      throw new Error('需要提供video和canvas元素');
+    if (!videoElement) {
+      throw new Error('需要提供video元素');
     }
 
     try {
@@ -89,13 +89,15 @@ export class ScreenRecorder {
         throw new Error('无法创建canvas context');
       }
 
-      // 绘制函数：合成video帧 + 涂鸦层
+      // 绘制函数：合成video帧 + 涂鸦层（如果有）
       const drawFrame = () => {
         // 绘制视频帧
         ctx.drawImage(videoElement, 0, 0, offscreenCanvas.width, offscreenCanvas.height);
         
-        // 叠加涂鸦层
-        ctx.drawImage(canvasElement, 0, 0, offscreenCanvas.width, offscreenCanvas.height);
+        // 叠加涂鸦层（如果存在）
+        if (canvasElement) {
+          ctx.drawImage(canvasElement, 0, 0, offscreenCanvas.width, offscreenCanvas.height);
+        }
         
         if (this.mediaRecorder?.state === 'recording') {
           this.animationFrameId = requestAnimationFrame(drawFrame);
