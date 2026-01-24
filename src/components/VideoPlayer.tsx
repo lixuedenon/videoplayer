@@ -50,6 +50,8 @@ interface VideoPlayerProps {
   activePanel?: 'search' | 'annotations' | null;
   onSetActivePanel?: (panel: 'search' | 'annotations' | null) => void;
   isSeekFromAnnotation?: boolean;
+  isSearchPanelOpen?: boolean;
+  onCloseSearchPanel?: () => void;
 }
 
 const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
@@ -78,7 +80,9 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
   onAnnotationChange,
   activePanel = null,
   onSetActivePanel,
-  isSeekFromAnnotation = false
+  isSeekFromAnnotation = false,
+  isSearchPanelOpen = false,
+  onCloseSearchPanel
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -540,8 +544,17 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    setShowAnnotationsList(true);
-                    onSetActivePanel?.('annotations');
+                    
+                    // 情况A：搜索列表打开 且 涂鸦列表也打开 → 只关闭搜索列表
+                    if (isSearchPanelOpen && showAnnotationsList) {
+                      onCloseSearchPanel?.();
+                    }
+                    // 情况C：涂鸦列表未打开 → 正常打开
+                    else if (!showAnnotationsList) {
+                      setShowAnnotationsList(true);
+                      onSetActivePanel?.('annotations');
+                    }
+                    // 情况B：涂鸦列表已在前 → 什么都不做
                   }}
                   className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg shadow-lg transition-all hover:scale-105 relative"
                   title="查看涂鸦列表"
@@ -688,8 +701,16 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
 
                   <button
                     onClick={() => {
-                      setShowAnnotationsList(true);
-                      onSetActivePanel?.('annotations');
+                      // 情况A：搜索列表打开 且 涂鸦列表也打开 → 只关闭搜索列表
+                      if (isSearchPanelOpen && showAnnotationsList) {
+                        onCloseSearchPanel?.();
+                      }
+                      // 情况C：涂鸦列表未打开 → 正常打开
+                      else if (!showAnnotationsList) {
+                        setShowAnnotationsList(true);
+                        onSetActivePanel?.('annotations');
+                      }
+                      // 情况B：涂鸦列表已在前 → 什么都不做
                     }}
                     className="flex items-center gap-2 px-3 py-1 bg-purple-600 hover:bg-purple-500 text-white rounded transition relative"
                     title="涂鸦列表"
