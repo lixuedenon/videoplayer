@@ -20,6 +20,7 @@ import { ButtonShape } from '../types/buttonCustomization';
 import { ScreenRecorder, RecordingMode } from '../utils/screenRecorder';
 import { DrawingCanvas } from './DrawingCanvas';
 import { LiveDrawingOverlay } from './LiveDrawingOverlay';
+import { LiveDrawingReplay } from './LiveDrawingReplay';
 import { AnnotationsList } from './AnnotationsList';
 import { Annotation, DrawingData } from '../types/annotation';
 import { saveAnnotation, getAnnotations, deleteAnnotation, getVideoSegmentSettings, saveVideoSegmentSettings } from '../utils/database';
@@ -103,6 +104,11 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [showDrawingCanvas, setShowDrawingCanvas] = useState(false);
   const [showLiveDrawing, setShowLiveDrawing] = useState(false);
+  const [showLivePlayback, setShowLivePlayback] = useState(false);
+  const [currentPlaybackData, setCurrentPlaybackData] = useState<{
+    liveDrawingData: any;
+    startTimestamp: number;
+  } | null>(null);
   const [showAnnotationsList, setShowAnnotationsList] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingMode, setRecordingMode] = useState<RecordingMode>('player');
@@ -279,9 +285,24 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
       setCurrentTime(current);
       onTimeUpdate(current, total);
 
+      // 检查是否需要关闭实时涂鸦回放
+      if (showLivePlayback && currentPlaybackData) {
+        const playbackEndTime = currentPlaybackData.startTimestamp + currentPlaybackData.liveDrawingData.duration;
+        if (current < currentPlaybackData.startTimestamp || current > playbackEndTime + 2) {
+          // 超出回放范围，关闭回放
+          setShowLivePlayback(false);
+          setCurrentPlaybackData(null);
+        }
+      }
+
       if (seekTargetEndTime.current !== null && current >= seekTargetEndTime.current) {
         videoRef.current.pause();
         seekTargetEndTime.current = null;
+        // 关闭实时涂鸦回放
+        if (showLivePlayback) {
+          setShowLivePlayback(false);
+          setCurrentPlaybackData(null);
+        }
         // 清除isSeekFromAnnotation标志,避免影响后续视频
         if (isSeekFromAnnotation && onAutoPlayComplete) {
           onAutoPlayComplete();
@@ -548,7 +569,9 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
     }
   };
 
-  const handleSeekToAnnotation = async (timestamp: number, targetVideoId?: string) => {
+  const handleSeekToAnnotation = async (annotation: Annotation) => {
+    const { timestamp, video_url: targetVideoId, is_live, live_drawing_data } = annotation;
+    
     if (targetVideoId && targetVideoId !== videoId) {
       if (onSwitchVideo) {
         onSwitchVideo(targetVideoId, timestamp);
@@ -566,6 +589,19 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
     video.currentTime = startTime;
     setCurrentTime(startTime);
     seekTargetEndTime.current = endTime;
+
+    // 如果是实时涂鸦，启动回放
+    if (is_live && live_drawing_data) {
+      setCurrentPlaybackData({
+        liveDrawingData: live_drawing_data,
+        startTimestamp: timestamp
+      });
+      setShowLivePlayback(true);
+    } else {
+      // 关闭回放（如果之前打开了）
+      setShowLivePlayback(false);
+      setCurrentPlaybackData(null);
+    }
 
     try {
       await video.play();
@@ -1070,6 +1106,16 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
         onClose={() => setShowLiveDrawing(false)}
         onSave={handleSaveLiveDrawing}
       />
+
+      {/* 实时涂鸦回放 */}
+      {showLivePlayback && currentPlaybackData && videoRef.current && (
+        <LiveDrawingReplay
+          videoElement={videoRef.current}
+          liveDrawingData={currentPlaybackData.liveDrawingData}
+          startTimestamp={currentPlaybackData.startTimestamp}
+          isActive={showLivePlayback}
+        />
+      )}
 
       {showAnnotationsList && (
         <div 
