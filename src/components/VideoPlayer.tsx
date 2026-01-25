@@ -288,8 +288,16 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
       // 检查是否需要关闭实时涂鸦回放
       if (showLivePlayback && currentPlaybackData) {
         const playbackEndTime = currentPlaybackData.startTimestamp + currentPlaybackData.liveDrawingData.duration;
+        console.log('⏱️ Playback time check:', {
+          current,
+          startTimestamp: currentPlaybackData.startTimestamp,
+          playbackEndTime,
+          shouldClose: current < currentPlaybackData.startTimestamp || current > playbackEndTime + 2
+        });
+        
         if (current < currentPlaybackData.startTimestamp || current > playbackEndTime + 2) {
           // 超出回放范围，关闭回放
+          console.log('🔴 Closing playback - out of range');
           setShowLivePlayback(false);
           setCurrentPlaybackData(null);
         }
