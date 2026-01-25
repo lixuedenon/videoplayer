@@ -66,22 +66,50 @@ export const LiveDrawingReplay: React.FC<LiveDrawingReplayProps> = ({
     });
 
     const renderFrame = () => {
-      if (!isActive) return;
+      if (!isActive) {
+        console.log('⏹️ renderFrame stopped: isActive=false');
+        return;
+      }
 
       const currentVideoTime = videoElement.currentTime;
       const relativeTime = currentVideoTime - startTimestamp;
 
+      console.log('🎨 renderFrame:', {
+        currentVideoTime,
+        startTimestamp,
+        relativeTime,
+        strokesCount: liveDrawingData.strokes.length
+      });
+
       // 清空画布
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+      let drawnStrokes = 0;
+
       // 绘制所有应该显示的笔画
-      liveDrawingData.strokes.forEach(stroke => {
+      liveDrawingData.strokes.forEach((stroke, index) => {
         // 只绘制已经开始的笔画
-        if (relativeTime < stroke.startTime) return;
+        if (relativeTime < stroke.startTime) {
+          console.log(`⏭️ Stroke ${index} not started yet:`, stroke.startTime, '>', relativeTime);
+          return;
+        }
 
         const isComplete = relativeTime >= stroke.endTime;
         
-        if (stroke.points.length < 2) return;
+        console.log(`🖌️ Drawing stroke ${index}:`, {
+          startTime: stroke.startTime,
+          endTime: stroke.endTime,
+          relativeTime,
+          isComplete,
+          pointsCount: stroke.points.length
+        });
+        
+        if (stroke.points.length < 2) {
+          console.log('⚠️ Stroke has less than 2 points');
+          return;
+        }
+
+        drawnStrokes++;
 
         ctx.strokeStyle = stroke.color;
         ctx.lineWidth = stroke.width;
@@ -118,6 +146,8 @@ export const LiveDrawingReplay: React.FC<LiveDrawingReplayProps> = ({
 
         ctx.stroke();
       });
+
+      console.log(`✅ Frame rendered, drew ${drawnStrokes} strokes`);
 
       ctx.globalCompositeOperation = 'source-over';
 
