@@ -34,13 +34,26 @@ export const LiveDrawingReplay: React.FC<LiveDrawingReplayProps> = ({
     });
 
     if (!isActive || !canvasRef.current) {
-      console.log('❌ LiveDrawingReplay: conditions not met');
+      console.log('❌ LiveDrawingReplay: conditions not met', {
+        isActive,
+        hasCanvas: !!canvasRef.current
+      });
       return;
     }
 
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    
+    console.log('🖌️ Canvas context:', {
+      hasCtx: !!ctx,
+      canvas: canvas,
+      canvasInDOM: document.body.contains(canvas)
+    });
+    
+    if (!ctx) {
+      console.error('❌ Failed to get canvas context!');
+      return;
+    }
 
     // 设置canvas尺寸
     canvas.width = liveDrawingData.canvasWidth;
