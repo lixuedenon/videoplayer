@@ -109,6 +109,7 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
     liveDrawingData: any;
     startTimestamp: number;
   } | null>(null);
+  const playbackStartTimeRef = useRef<number | null>(null);
   const [showAnnotationsList, setShowAnnotationsList] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingMode, setRecordingMode] = useState<RecordingMode>('player');
@@ -288,14 +289,22 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
       // 检查是否需要关闭实时涂鸦回放
       if (showLivePlayback && currentPlaybackData) {
         const playbackEndTime = currentPlaybackData.startTimestamp + currentPlaybackData.liveDrawingData.duration;
+        
+        // 允许在startTimestamp之前的缓冲区播放
+        // replayBufferBefore秒前就可以开始播放，给涂鸦足够的展示时间
+        const allowedStartTime = Math.max(0, currentPlaybackData.startTimestamp - replayBufferBefore);
+        
         console.log('⏱️ Playback time check:', {
           current,
+          allowedStartTime,
           startTimestamp: currentPlaybackData.startTimestamp,
           playbackEndTime,
-          shouldClose: current < currentPlaybackData.startTimestamp || current > playbackEndTime + 2
+          replayBufferBefore,
+          shouldClose: current < allowedStartTime - 1 || current > playbackEndTime + 2
         });
         
-        if (current < currentPlaybackData.startTimestamp || current > playbackEndTime + 2) {
+        // 只有在明显超出范围时才关闭（允许1秒误差）
+        if (current < allowedStartTime - 1 || current > playbackEndTime + 2) {
           // 超出回放范围，关闭回放
           console.log('🔴 Closing playback - out of range');
           setShowLivePlayback(false);
@@ -594,8 +603,14 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
     if (!videoRef.current) return;
 
     const video = videoRef.current;
-    const startTime = Math.max(0, timestamp - replayBufferBefore);
-    const endTime = Math.min(duration, timestamp + replayBufferAfter);
+    
+    // 如果是实时涂鸦，直接跳到涂鸦开始时间
+    // 如果是静态涂鸦，使用缓冲时间
+    const startTime = (is_live && live_drawing_data) 
+      ? timestamp  // 实时涂鸦：直接跳到开始时间
+      : Math.max(0, timestamp - replayBufferBefore);  // 静态涂鸦：使用缓冲
+    
+    const endTime = Math.min(duration, timestamp + (live_drawing_data?.duration || replayBufferAfter));
 
     video.currentTime = startTime;
     setCurrentTime(startTime);
@@ -607,6 +622,7 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
         liveDrawingData: live_drawing_data,
         startTimestamp: timestamp
       });
+      playbackStartTimeRef.current = Date.now();  // 记录启动时间
       setCurrentPlaybackData({
         liveDrawingData: live_drawing_data,
         startTimestamp: timestamp
