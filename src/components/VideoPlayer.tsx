@@ -1085,6 +1085,16 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
               </div>
             </div>
           </div>
+
+          {/* 实时涂鸦回放 - 必须在relative容器内 */}
+          {showLivePlayback && currentPlaybackData && videoRef.current && (
+            <LiveDrawingReplay
+              videoElement={videoRef.current}
+              liveDrawingData={currentPlaybackData.liveDrawingData}
+              startTimestamp={currentPlaybackData.startTimestamp}
+              isActive={showLivePlayback}
+            />
+          )}
         </>
       ) : (
         <div className="flex items-center justify-center h-full text-gray-400 px-8">
@@ -1114,16 +1124,6 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
         onClose={() => setShowLiveDrawing(false)}
         onSave={handleSaveLiveDrawing}
       />
-
-      {/* 实时涂鸦回放 */}
-      {showLivePlayback && currentPlaybackData && videoRef.current && (
-        <LiveDrawingReplay
-          videoElement={videoRef.current}
-          liveDrawingData={currentPlaybackData.liveDrawingData}
-          startTimestamp={currentPlaybackData.startTimestamp}
-          isActive={showLivePlayback}
-        />
-      )}
 
       {showAnnotationsList && (
         <div 
