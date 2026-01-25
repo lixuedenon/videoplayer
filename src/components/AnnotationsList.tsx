@@ -213,11 +213,7 @@ export const AnnotationsList: React.FC<AnnotationsListProps> = ({
   };
 
   const handleAnnotationClick = (annotation: Annotation) => {
-    if (annotation.video_url === currentVideoUrl) {
-      onSeek(annotation.timestamp);
-    } else {
-      onSeek(annotation.timestamp, annotation.video_url);
-    }
+    onSeek(annotation);
   };
 
   const handleDownload = (annotation: Annotation) => {
