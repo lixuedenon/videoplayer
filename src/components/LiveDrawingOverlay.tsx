@@ -44,6 +44,7 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
   const [currentStroke, setCurrentStroke] = useState<Point[]>([]);
   const [startTimestamp, setStartTimestamp] = useState<number>(0);
   const [currentStrokeStartTime, setCurrentStrokeStartTime] = useState<number>(0);
+  const [isSaving, setIsSaving] = useState(false);
 
   // 初始化开始时间
   useEffect(() => {
@@ -270,7 +271,12 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
 
   // 保存标注
   const handleSave = () => {
-    console.log('💾 handleSave called, strokes:', strokes.length);
+    console.log('💾 handleSave called, strokes:', strokes.length, 'isSaving:', isSaving);
+    
+    if (isSaving) {
+      console.log('⚠️ Already saving, ignoring duplicate call');
+      return;
+    }
     
     if (strokes.length === 0) {
       alert('还没有涂鸦内容');
@@ -278,6 +284,8 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
     }
 
     if (!videoElement) return;
+
+    setIsSaving(true);
 
     const duration = videoElement.currentTime - startTimestamp;
     const thumbnail = generateThumbnail();
@@ -298,6 +306,7 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
     // 保存后清空
     handleClear();
     onClose();
+    setIsSaving(false);
   };
 
   if (!isActive) return null;
@@ -404,7 +413,7 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
         {/* 保存标注 */}
         <button
           onClick={handleSave}
-          disabled={strokes.length === 0}
+          disabled={strokes.length === 0 || isSaving}
           className="p-2 rounded bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition"
           title="保存标注"
         >
