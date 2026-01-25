@@ -129,13 +129,21 @@ export const LiveDrawingReplay: React.FC<LiveDrawingReplayProps> = ({
     renderFrame();
 
     return () => {
+      console.log('🔴 LiveDrawingReplay cleanup - unmounting');
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
   }, [isActive, videoElement, liveDrawingData, startTimestamp]);
 
-  if (!isActive) return null;
+  console.log('🎨 LiveDrawingReplay return, isActive:', isActive);
+
+  if (!isActive) {
+    console.log('❌ LiveDrawingReplay: isActive=false, returning null');
+    return null;
+  }
+
+  console.log('✅ LiveDrawingReplay: returning canvas element');
 
   return (
     <canvas
