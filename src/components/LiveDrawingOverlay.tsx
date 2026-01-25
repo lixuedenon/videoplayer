@@ -270,6 +270,8 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
 
   // 保存标注
   const handleSave = () => {
+    console.log('💾 handleSave called, strokes:', strokes.length);
+    
     if (strokes.length === 0) {
       alert('还没有涂鸦内容');
       return;
@@ -279,6 +281,12 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
 
     const duration = videoElement.currentTime - startTimestamp;
     const thumbnail = generateThumbnail();
+
+    console.log('💾 Calling onSave with data:', {
+      strokesCount: strokes.length,
+      duration,
+      startTimestamp
+    });
 
     onSave?.({
       strokes,
