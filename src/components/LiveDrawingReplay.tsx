@@ -17,8 +17,26 @@ export const LiveDrawingReplay: React.FC<LiveDrawingReplayProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationFrameRef = useRef<number | null>(null);
 
+  console.log('🎬 LiveDrawingReplay render:', {
+    isActive,
+    hasCanvas: !!canvasRef.current,
+    hasVideoElement: !!videoElement,
+    dataStrokes: liveDrawingData?.strokes?.length,
+    startTimestamp
+  });
+
   useEffect(() => {
-    if (!isActive || !canvasRef.current) return;
+    console.log('🎬 LiveDrawingReplay useEffect triggered:', {
+      isActive,
+      hasCanvas: !!canvasRef.current,
+      canvasWidth: liveDrawingData.canvasWidth,
+      canvasHeight: liveDrawingData.canvasHeight
+    });
+
+    if (!isActive || !canvasRef.current) {
+      console.log('❌ LiveDrawingReplay: conditions not met');
+      return;
+    }
 
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
@@ -27,6 +45,12 @@ export const LiveDrawingReplay: React.FC<LiveDrawingReplayProps> = ({
     // 设置canvas尺寸
     canvas.width = liveDrawingData.canvasWidth;
     canvas.height = liveDrawingData.canvasHeight;
+    
+    console.log('✅ Canvas initialized:', {
+      width: canvas.width,
+      height: canvas.height,
+      strokesCount: liveDrawingData.strokes.length
+    });
 
     const renderFrame = () => {
       if (!isActive) return;
