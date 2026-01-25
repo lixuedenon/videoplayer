@@ -570,7 +570,10 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
   };
 
   const handleSeekToAnnotation = async (annotation: Annotation) => {
+    console.log('handleSeekToAnnotation called', annotation);
     const { timestamp, video_url: targetVideoId, is_live, live_drawing_data } = annotation;
+    
+    console.log('is_live:', is_live, 'live_drawing_data:', live_drawing_data);
     
     if (targetVideoId && targetVideoId !== videoId) {
       if (onSwitchVideo) {
@@ -592,12 +595,17 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
 
     // 如果是实时涂鸦，启动回放
     if (is_live && live_drawing_data) {
+      console.log('启动实时涂鸦回放', {
+        liveDrawingData: live_drawing_data,
+        startTimestamp: timestamp
+      });
       setCurrentPlaybackData({
         liveDrawingData: live_drawing_data,
         startTimestamp: timestamp
       });
       setShowLivePlayback(true);
     } else {
+      console.log('非实时涂鸦或缺少数据，关闭回放');
       // 关闭回放（如果之前打开了）
       setShowLivePlayback(false);
       setCurrentPlaybackData(null);
@@ -930,7 +938,7 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
                 {videoId && annotations.filter(a => a.video_url === videoId).map(annotation => (
                   <button
                     key={annotation.id}
-                    onClick={() => handleSeekToAnnotation(annotation.timestamp)}
+                    onClick={() => handleSeekToAnnotation(annotation)}
                     className="absolute top-0 w-3 h-3 bg-yellow-400 rounded-full transform -translate-x-1/2 -translate-y-1 hover:bg-yellow-300 hover:scale-125 transition shadow-lg"
                     style={{
                       left: `${(annotation.timestamp / duration) * 100}%`
