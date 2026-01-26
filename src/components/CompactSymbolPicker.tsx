@@ -36,9 +36,9 @@ export const CompactSymbolPicker: React.FC<CompactSymbolPickerProps> = ({
         <ChevronDown size={14} />
       </button>
 
-      {/* 悬停展开的符号面板 */}
+      {/* 悬停展开的符号面板 - 向上展开 */}
       {isVisible && (
-        <div className="absolute top-full left-0 mt-1 bg-gray-800 rounded-lg shadow-2xl border border-gray-700 p-3 z-50 w-[420px] max-h-[400px] overflow-y-auto">
+        <div className="absolute bottom-full right-0 mb-1 bg-gray-800 rounded-lg shadow-2xl border border-gray-700 p-3 z-50 w-[360px] max-h-[400px] overflow-y-auto">
           {SYMBOL_CATEGORIES.map(category => (
             <div key={category.id} className="mb-3 last:mb-0">
               {/* 分类标题 */}
