@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Paintbrush, Eraser, Trash2, Undo, Square, Save, Smile } from 'lucide-react';
-import { SymbolPicker } from './SymbolPicker';
+import { Paintbrush, Eraser, Trash2, Undo, Square, Save } from 'lucide-react';
+import { CompactSymbolPicker } from './CompactSymbolPicker';
 import type { SymbolItem } from '../constants/symbols';
 
 interface LiveDrawingOverlayProps {
@@ -47,7 +47,7 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
   const [currentTool, setCurrentTool] = useState<DrawingTool>('pen');
   const [penColor, setPenColor] = useState('#FF0000');
   const [penWidth, setPenWidth] = useState(3);
-  const [showSymbolPicker, setShowSymbolPicker] = useState(false);
+  const [showSymbolPanel, setShowSymbolPanel] = useState(false);
   const [selectedSymbol, setSelectedSymbol] = useState<SymbolItem | null>(null);
   const [strokes, setStrokes] = useState<Stroke[]>([]);
   const [currentStroke, setCurrentStroke] = useState<Point[]>([]);
@@ -254,7 +254,7 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
   const handleSymbolSelect = (symbol: SymbolItem) => {
     setCurrentTool('symbol');
     setSelectedSymbol(symbol);
-    setShowSymbolPicker(false);
+    // 不关闭面板，允许连续选择
   };
 
   const drawSymbol = (ctx: CanvasRenderingContext2D, stroke: Stroke) => {
@@ -419,16 +419,14 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
             <Eraser size={20} />
           </button>
           
-          {/* 符号工具 */}
-          <button
-            onClick={() => setShowSymbolPicker(true)}
-            className={`p-2 rounded transition ${
-              currentTool === 'symbol' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-            }`}
-            title="添加符号"
-          >
-            <Smile size={20} />
-          </button>
+          {/* 符号工具 - 悬停展开 */}
+          <CompactSymbolPicker
+            isVisible={showSymbolPanel}
+            selectedSymbol={selectedSymbol}
+            onSelect={handleSymbolSelect}
+            onMouseEnter={() => setShowSymbolPanel(true)}
+            onMouseLeave={() => setShowSymbolPanel(false)}
+          />
         </div>
 
         <div className="w-px h-6 bg-gray-600"></div>
@@ -564,13 +562,6 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
           </div>
         </div>
       )}
-
-      {/* 符号选择面板 */}
-      <SymbolPicker
-        isOpen={showSymbolPicker}
-        onSelect={handleSymbolSelect}
-        onClose={() => setShowSymbolPicker(false)}
-      />
     </div>
   );
 };
