@@ -162,10 +162,27 @@ export const isFileSystemAccessSupported = (): boolean => {
 
 export const requestDirectoryAccess = async (): Promise<FileSystemDirectoryHandle | null> => {
   try {
+    // 首先尝试恢复已保存的handle
+    const savedHandle = await getDirectoryHandle();
+    if (savedHandle) {
+      // 验证权限
+      const hasPermission = await verifyPermission(savedHandle);
+      if (hasPermission) {
+        console.log('Restored directory handle from storage');
+        return savedHandle;
+      }
+    }
+
+    // 如果没有保存的handle或权限失败，请求新的
     if ('showDirectoryPicker' in window) {
       const dirHandle = await window.showDirectoryPicker({
         mode: 'read'
       });
+      
+      // 保存新的handle
+      await saveDirectoryHandle(dirHandle);
+      console.log('Directory handle saved');
+      
       return dirHandle;
     }
     return null;
