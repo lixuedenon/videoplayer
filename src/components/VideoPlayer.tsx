@@ -479,7 +479,11 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
         width: stroke.width,
         points: stroke.points,
         startTime: stroke.startTime,
-        endTime: stroke.endTime
+        endTime: stroke.endTime,
+        // 符号字段（如果存在）
+        symbolId: stroke.symbolId,
+        symbolChar: stroke.symbolChar,
+        symbolSize: stroke.symbolSize
       })),
       duration: data.duration,
       canvasWidth,
