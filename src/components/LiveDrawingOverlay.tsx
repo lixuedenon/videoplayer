@@ -10,6 +10,7 @@ interface LiveDrawingOverlayProps {
     startTimestamp: number;
     duration: number;
     thumbnail: string;
+    name: string;  // 添加名称字段
   }) => void;
 }
 
@@ -271,12 +272,7 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
 
   // 保存标注
   const handleSave = () => {
-    console.log('💾 handleSave called, strokes:', strokes.length, 'isSaving:', isSaving);
-    
-    if (isSaving) {
-      console.log('⚠️ Already saving, ignoring duplicate call');
-      return;
-    }
+    if (isSaving) return;
     
     if (strokes.length === 0) {
       alert('还没有涂鸦内容');
@@ -285,22 +281,27 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
 
     if (!videoElement) return;
 
+    // 请求用户输入涂鸦名称
+    const defaultName = `实时涂鸦 ${new Date().toLocaleTimeString()}`;
+    const userName = prompt('请为这个涂鸦起一个名称：', defaultName);
+    
+    // 用户取消了命名
+    if (userName === null) return;
+    
+    // 使用用户输入的名称或默认名称
+    const finalName = userName.trim() || defaultName;
+
     setIsSaving(true);
 
     const duration = videoElement.currentTime - startTimestamp;
     const thumbnail = generateThumbnail();
 
-    console.log('💾 Calling onSave with data:', {
-      strokesCount: strokes.length,
-      duration,
-      startTimestamp
-    });
-
     onSave?.({
       strokes,
       startTimestamp,
       duration,
-      thumbnail
+      thumbnail,
+      name: finalName  // 添加名称
     });
 
     // 保存后清空
