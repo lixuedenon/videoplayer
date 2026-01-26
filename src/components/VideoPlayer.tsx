@@ -92,6 +92,7 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
   onCloseSearchPanel
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -366,11 +367,11 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
   };
 
   const toggleFullscreen = () => {
-    if (videoRef.current) {
+    if (containerRef.current) {
       if (document.fullscreenElement) {
         document.exitFullscreen();
       } else {
-        videoRef.current.requestFullscreen();
+        containerRef.current.requestFullscreen();
       }
     }
   };
@@ -545,8 +546,6 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
       if (onAnnotationChange) {
         onAnnotationChange();
       }
-
-      alert('实时涂鸦已保存！');
     } catch (error) {
       console.error('Failed to save live drawing:', error);
       alert(`保存失败: ${error}`);
@@ -767,6 +766,7 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
 
   return (
     <div
+      ref={containerRef}
       className="relative w-full h-full bg-black group"
       onMouseMove={handleMouseMove}
       onMouseLeave={() => isPlaying && setShowControls(false)}
