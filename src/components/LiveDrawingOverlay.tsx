@@ -14,7 +14,7 @@ interface LiveDrawingOverlayProps {
   }) => void;
 }
 
-type DrawingTool = 'pen' | 'eraser';
+type DrawingTool = 'pen' | 'eraser' | 'symbol';
 
 interface Point {
   x: number;
@@ -28,6 +28,10 @@ interface Stroke {
   points: Point[];
   startTime: number;  // 相对时间（秒）
   endTime: number;
+  // 符号相关（当tool='symbol'时使用）
+  symbolId?: string;
+  symbolChar?: string;
+  symbolSize?: number;
 }
 
 export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
