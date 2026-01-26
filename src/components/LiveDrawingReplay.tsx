@@ -17,99 +17,48 @@ export const LiveDrawingReplay: React.FC<LiveDrawingReplayProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationFrameRef = useRef<number | null>(null);
 
-  console.log('🎬 LiveDrawingReplay render:', {
-    isActive,
-    hasCanvas: !!canvasRef.current,
-    hasVideoElement: !!videoElement,
-    dataStrokes: liveDrawingData?.strokes?.length,
-    startTimestamp
-  });
-
   useEffect(() => {
-    console.log('🎬 LiveDrawingReplay useEffect triggered:', {
-      isActive,
-      hasCanvas: !!canvasRef.current,
-      canvasWidth: liveDrawingData.canvasWidth,
-      canvasHeight: liveDrawingData.canvasHeight
-    });
-
-    if (!isActive || !canvasRef.current) {
-      console.log('❌ LiveDrawingReplay: conditions not met', {
-        isActive,
-        hasCanvas: !!canvasRef.current
-      });
-      return;
-    }
+    if (!isActive || !canvasRef.current) return;
 
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     
-    console.log('🖌️ Canvas context:', {
-      hasCtx: !!ctx,
-      canvas: canvas,
-      canvasInDOM: document.body.contains(canvas)
-    });
-    
-    if (!ctx) {
-      console.error('❌ Failed to get canvas context!');
-      return;
-    }
+    if (!ctx) return;
 
     // 设置canvas尺寸
     canvas.width = liveDrawingData.canvasWidth;
     canvas.height = liveDrawingData.canvasHeight;
-    
-    console.log('✅ Canvas initialized:', {
-      width: canvas.width,
-      height: canvas.height,
-      strokesCount: liveDrawingData.strokes.length
-    });
 
     const renderFrame = () => {
-      if (!isActive) {
-        console.log('⏹️ renderFrame stopped: isActive=false');
-        return;
-      }
+      if (!isActive) return;
 
       const currentVideoTime = videoElement.currentTime;
       const relativeTime = currentVideoTime - startTimestamp;
 
-      console.log('🎨 renderFrame:', {
-        currentVideoTime,
-        startTimestamp,
-        relativeTime,
-        strokesCount: liveDrawingData.strokes.length
-      });
-
       // 清空画布
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      let drawnStrokes = 0;
-
       // 绘制所有应该显示的笔画
-      liveDrawingData.strokes.forEach((stroke, index) => {
+      liveDrawingData.strokes.forEach(stroke => {
         // 只绘制已经开始的笔画
-        if (relativeTime < stroke.startTime) {
-          console.log(`⏭️ Stroke ${index} not started yet:`, stroke.startTime, '>', relativeTime);
+        if (relativeTime < stroke.startTime) return;
+
+        // 符号类型：直接绘制符号
+        if (stroke.tool === 'symbol' && stroke.symbolChar) {
+          ctx.save();
+          ctx.font = `${stroke.symbolSize || 40}px Arial`;
+          ctx.fillStyle = stroke.color;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(stroke.symbolChar, stroke.points[0].x, stroke.points[0].y);
+          ctx.restore();
           return;
         }
 
+        // 画笔/橡皮擦类型：绘制路径
         const isComplete = relativeTime >= stroke.endTime;
         
-        console.log(`🖌️ Drawing stroke ${index}:`, {
-          startTime: stroke.startTime,
-          endTime: stroke.endTime,
-          relativeTime,
-          isComplete,
-          pointsCount: stroke.points.length
-        });
-        
-        if (stroke.points.length < 2) {
-          console.log('⚠️ Stroke has less than 2 points');
-          return;
-        }
-
-        drawnStrokes++;
+        if (stroke.points.length < 2) return;
 
         ctx.strokeStyle = stroke.color;
         ctx.lineWidth = stroke.width;
@@ -147,8 +96,6 @@ export const LiveDrawingReplay: React.FC<LiveDrawingReplayProps> = ({
         ctx.stroke();
       });
 
-      console.log(`✅ Frame rendered, drew ${drawnStrokes} strokes`);
-
       ctx.globalCompositeOperation = 'source-over';
 
       // 继续下一帧
@@ -159,21 +106,13 @@ export const LiveDrawingReplay: React.FC<LiveDrawingReplayProps> = ({
     renderFrame();
 
     return () => {
-      console.log('🔴 LiveDrawingReplay cleanup - unmounting');
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
   }, [isActive, videoElement, liveDrawingData, startTimestamp]);
 
-  console.log('🎨 LiveDrawingReplay return, isActive:', isActive);
-
-  if (!isActive) {
-    console.log('❌ LiveDrawingReplay: isActive=false, returning null');
-    return null;
-  }
-
-  console.log('✅ LiveDrawingReplay: returning canvas element');
+  if (!isActive) return null;
 
   return (
     <canvas
