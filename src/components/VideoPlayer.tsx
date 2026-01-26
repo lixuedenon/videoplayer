@@ -289,24 +289,10 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
       // 检查是否需要关闭实时涂鸦回放
       if (showLivePlayback && currentPlaybackData) {
         const playbackEndTime = currentPlaybackData.startTimestamp + currentPlaybackData.liveDrawingData.duration;
-        
-        // 允许在startTimestamp之前的缓冲区播放
-        // replayBufferBefore秒前就可以开始播放，给涂鸦足够的展示时间
         const allowedStartTime = Math.max(0, currentPlaybackData.startTimestamp - replayBufferBefore);
-        
-        console.log('⏱️ Playback time check:', {
-          current,
-          allowedStartTime,
-          startTimestamp: currentPlaybackData.startTimestamp,
-          playbackEndTime,
-          replayBufferBefore,
-          shouldClose: current < allowedStartTime - 1 || current > playbackEndTime + 2
-        });
         
         // 只有在明显超出范围时才关闭（允许1秒误差）
         if (current < allowedStartTime - 1 || current > playbackEndTime + 2) {
-          // 超出回放范围，关闭回放
-          console.log('🔴 Closing playback - out of range');
           setShowLivePlayback(false);
           setCurrentPlaybackData(null);
         }
@@ -472,9 +458,8 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
     startTimestamp: number;
     duration: number;
     thumbnail: string;
+    name: string;
   }) => {
-    console.log('开始保存实时涂鸦', data);
-    
     if (!videoId || !videoRef.current) {
       console.error('缺少videoId或videoRef');
       return;
@@ -484,8 +469,6 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
     const liveCanvas = document.querySelector('canvas');
     const canvasWidth = liveCanvas?.width || videoRef.current.videoWidth || 1280;
     const canvasHeight = liveCanvas?.height || videoRef.current.videoHeight || 720;
-
-    console.log('Canvas尺寸:', canvasWidth, 'x', canvasHeight);
 
     // 转换为LiveDrawingData格式
     const liveDrawingData = {
@@ -501,8 +484,6 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
       canvasWidth,
       canvasHeight
     };
-
-    console.log('LiveDrawingData:', liveDrawingData);
 
     // 创建一个空的DrawingData（兼容现有数据结构）
     const drawingData: DrawingData = {
@@ -541,7 +522,6 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
 
         if (filePath) {
           finalThumbnail = filePath;
-          console.log('缩略图已保存:', filePath);
         }
       } catch (error) {
         console.error('Failed to save thumbnail:', error);
@@ -549,22 +529,17 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
     }
 
     try {
-      console.log('调用saveAnnotation...');
       const result = await saveAnnotation(
         videoId,
         data.startTimestamp,
         drawingData,
         finalThumbnail,
-        `实时涂鸦 ${new Date().toLocaleTimeString()}`,
+        data.name,  // 使用用户输入的名称
         '',
         liveDrawingData  // 传递动态涂鸦数据
       );
 
-      console.log('保存结果:', result);
-
       const updatedAnnotations = await getAnnotations();
-      console.log('更新后的标注列表:', updatedAnnotations);
-      
       setAnnotations(updatedAnnotations);
       
       if (onAnnotationChange) {
@@ -587,10 +562,7 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
   };
 
   const handleSeekToAnnotation = async (annotation: Annotation) => {
-    console.log('handleSeekToAnnotation called', annotation);
     const { timestamp, video_url: targetVideoId, is_live, live_drawing_data } = annotation;
-    
-    console.log('is_live:', is_live, 'live_drawing_data:', live_drawing_data);
     
     if (targetVideoId && targetVideoId !== videoId) {
       if (onSwitchVideo) {
@@ -618,18 +590,13 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
 
     // 如果是实时涂鸦，启动回放
     if (is_live && live_drawing_data) {
-      console.log('启动实时涂鸦回放', {
-        liveDrawingData: live_drawing_data,
-        startTimestamp: timestamp
-      });
-      playbackStartTimeRef.current = Date.now();  // 记录启动时间
+      playbackStartTimeRef.current = Date.now();
       setCurrentPlaybackData({
         liveDrawingData: live_drawing_data,
         startTimestamp: timestamp
       });
       setShowLivePlayback(true);
     } else {
-      console.log('非实时涂鸦或缺少数据，关闭回放');
       // 关闭回放（如果之前打开了）
       setShowLivePlayback(false);
       setCurrentPlaybackData(null);
