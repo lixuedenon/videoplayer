@@ -46,6 +46,8 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
   const [startTimestamp, setStartTimestamp] = useState<number>(0);
   const [currentStrokeStartTime, setCurrentStrokeStartTime] = useState<number>(0);
   const [isSaving, setIsSaving] = useState(false);
+  const [showNameDialog, setShowNameDialog] = useState(false);
+  const [inputName, setInputName] = useState('');
 
   // 初始化开始时间
   useEffect(() => {
@@ -281,17 +283,19 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
 
     if (!videoElement) return;
 
-    // 请求用户输入涂鸦名称
+    // 设置默认名称并显示对话框
     const defaultName = `实时涂鸦 ${new Date().toLocaleTimeString()}`;
-    const userName = prompt('请为这个涂鸦起一个名称：', defaultName);
-    
-    // 用户取消了命名
-    if (userName === null) return;
-    
-    // 使用用户输入的名称或默认名称
-    const finalName = userName.trim() || defaultName;
+    setInputName(defaultName);
+    setShowNameDialog(true);
+  };
 
+  const handleConfirmSave = () => {
+    if (!videoElement) return;
+
+    const finalName = inputName.trim() || `实时涂鸦 ${new Date().toLocaleTimeString()}`;
+    
     setIsSaving(true);
+    setShowNameDialog(false);
 
     const duration = videoElement.currentTime - startTimestamp;
     const thumbnail = generateThumbnail();
@@ -301,13 +305,17 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
       startTimestamp,
       duration,
       thumbnail,
-      name: finalName  // 添加名称
+      name: finalName
     });
 
-    // 保存后清空
+    // 保存后清空并关闭
     handleClear();
     onClose();
     setIsSaving(false);
+  };
+
+  const handleCancelSave = () => {
+    setShowNameDialog(false);
   };
 
   if (!isActive) return null;
@@ -430,6 +438,59 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
           <Square size={20} />
         </button>
       </div>
+
+      {/* 命名对话框（内联） */}
+      {showNameDialog && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center">
+          {/* 背景遮罩 */}
+          <div 
+            className="absolute inset-0 bg-black bg-opacity-60 backdrop-blur-sm"
+            onClick={handleCancelSave}
+          />
+          
+          {/* 对话框 */}
+          <div className="relative bg-gray-800 rounded-lg shadow-2xl border border-gray-700 w-full max-w-md mx-4 animate-[fadeIn_0.2s_ease-out]">
+            {/* 标题 */}
+            <div className="px-6 py-4 border-b border-gray-700">
+              <h3 className="text-lg font-semibold text-white">保存实时涂鸦</h3>
+            </div>
+            
+            {/* 内容 */}
+            <div className="px-6 py-4">
+              <p className="text-gray-300 mb-4">请为这个涂鸦起一个名称：</p>
+              
+              <input
+                type="text"
+                value={inputName}
+                onChange={(e) => setInputName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleConfirmSave();
+                  if (e.key === 'Escape') handleCancelSave();
+                }}
+                placeholder="输入涂鸦名称"
+                className="w-full px-4 py-2 bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                autoFocus
+              />
+            </div>
+            
+            {/* 按钮 */}
+            <div className="px-6 py-4 border-t border-gray-700 flex justify-end gap-3">
+              <button
+                onClick={handleCancelSave}
+                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleConfirmSave}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition"
+              >
+                确定
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
