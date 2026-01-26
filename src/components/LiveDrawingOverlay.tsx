@@ -1,5 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Paintbrush, Eraser, Trash2, Undo, Square, Save } from 'lucide-react';
+import { Paintbrush, Eraser, Trash2, Undo, Square, Save, Smile } from 'lucide-react';
+import { SymbolPicker } from './SymbolPicker';
+import type { SymbolItem } from '../constants/symbols';
 
 interface LiveDrawingOverlayProps {
   videoElement: HTMLVideoElement | null;
@@ -45,6 +47,8 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
   const [currentTool, setCurrentTool] = useState<DrawingTool>('pen');
   const [penColor, setPenColor] = useState('#FF0000');
   const [penWidth, setPenWidth] = useState(3);
+  const [showSymbolPicker, setShowSymbolPicker] = useState(false);
+  const [selectedSymbol, setSelectedSymbol] = useState<SymbolItem | null>(null);
   const [strokes, setStrokes] = useState<Stroke[]>([]);
   const [currentStroke, setCurrentStroke] = useState<Point[]>([]);
   const [startTimestamp, setStartTimestamp] = useState<number>(0);
@@ -93,6 +97,13 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     strokes.forEach(stroke => {
+      // 符号类型：使用drawSymbol绘制
+      if (stroke.tool === 'symbol') {
+        drawSymbol(ctx, stroke);
+        return;
+      }
+      
+      // 画笔/橡皮擦类型：绘制路径
       if (stroke.points.length < 2) return;
 
       ctx.strokeStyle = stroke.color;
@@ -132,8 +143,37 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
   };
 
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    setIsDrawing(true);
     const point = getCanvasCoordinates(e);
+    
+    // 符号工具：点击放置符号
+    if (currentTool === 'symbol') {
+      if (!selectedSymbol || !videoElement) return;
+      
+      const symbolStroke: Stroke = {
+        tool: 'symbol',
+        color: penColor,
+        width: penWidth,
+        points: [point],
+        startTime: videoElement.currentTime - startTimestamp,
+        endTime: videoElement.currentTime - startTimestamp,
+        symbolId: selectedSymbol.id,
+        symbolChar: selectedSymbol.char,
+        symbolSize: 40 // 默认大小
+      };
+      
+      setStrokes(prev => [...prev, symbolStroke]);
+      
+      // 立即绘制符号
+      const canvas = canvasRef.current;
+      const ctx = canvas?.getContext('2d');
+      if (ctx) {
+        drawSymbol(ctx, symbolStroke);
+      }
+      return;
+    }
+    
+    // 画笔/橡皮擦：开始绘制
+    setIsDrawing(true);
     setCurrentStroke([point]);
     
     // 记录笔画开始时间（相对于标注开始时间）
@@ -209,6 +249,24 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
     if (!ctx) return;
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+  };
+
+  const handleSymbolSelect = (symbol: SymbolItem) => {
+    setCurrentTool('symbol');
+    setSelectedSymbol(symbol);
+    setShowSymbolPicker(false);
+  };
+
+  const drawSymbol = (ctx: CanvasRenderingContext2D, stroke: Stroke) => {
+    if (!stroke.symbolChar || stroke.points.length === 0) return;
+    
+    ctx.save();
+    ctx.font = `${stroke.symbolSize || 40}px Arial`;
+    ctx.fillStyle = stroke.color;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(stroke.symbolChar, stroke.points[0].x, stroke.points[0].y);
+    ctx.restore();
   };
 
   const handleUndo = () => {
@@ -360,6 +418,17 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
           >
             <Eraser size={20} />
           </button>
+          
+          {/* 符号工具 */}
+          <button
+            onClick={() => setShowSymbolPicker(true)}
+            className={`p-2 rounded transition ${
+              currentTool === 'symbol' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+            }`}
+            title="添加符号"
+          >
+            <Smile size={20} />
+          </button>
         </div>
 
         <div className="w-px h-6 bg-gray-600"></div>
@@ -495,6 +564,13 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
           </div>
         </div>
       )}
+
+      {/* 符号选择面板 */}
+      <SymbolPicker
+        isOpen={showSymbolPicker}
+        onSelect={handleSymbolSelect}
+        onClose={() => setShowSymbolPicker(false)}
+      />
     </div>
   );
 };
