@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Paintbrush, Eraser, Trash2, Undo, Square, Save } from 'lucide-react';
+import { Paintbrush, Eraser, Trash2, Undo, Square, Save, Type } from 'lucide-react';
 import { CompactSymbolPicker } from './CompactSymbolPicker';
 import type { SymbolItem } from '../constants/symbols';
 
@@ -16,7 +16,7 @@ interface LiveDrawingOverlayProps {
   }) => void;
 }
 
-type DrawingTool = 'pen' | 'eraser' | 'symbol';
+type DrawingTool = 'pen' | 'eraser' | 'symbol' | 'text';
 
 interface Point {
   x: number;
@@ -34,6 +34,10 @@ interface Stroke {
   symbolId?: string;
   symbolChar?: string;
   symbolSize?: number;
+  // 文字相关（当tool='text'时使用）
+  text?: string;
+  fontSize?: number;
+}
 }
 
 export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
@@ -97,6 +101,12 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     strokes.forEach(stroke => {
+      // 文字类型：使用drawText绘制
+      if (stroke.tool === 'text') {
+        drawText(ctx, stroke);
+        return;
+      }
+      
       // 符号类型：使用drawSymbol绘制
       if (stroke.tool === 'symbol') {
         drawSymbol(ctx, stroke);
@@ -144,6 +154,35 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
 
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const point = getCanvasCoordinates(e);
+    
+    // 文字工具：点击输入文字
+    if (currentTool === 'text') {
+      if (!videoElement) return;
+      
+      const text = prompt('请输入文字：');
+      if (!text || text.trim() === '') return;
+      
+      const textStroke: Stroke = {
+        tool: 'text',
+        color: penColor,
+        width: penWidth,
+        points: [point],
+        startTime: videoElement.currentTime - startTimestamp,
+        endTime: videoElement.currentTime - startTimestamp,
+        text: text.trim(),
+        fontSize: 24 // 默认字体大小
+      };
+      
+      setStrokes(prev => [...prev, textStroke]);
+      
+      // 立即绘制文字
+      const canvas = canvasRef.current;
+      const ctx = canvas?.getContext('2d');
+      if (ctx) {
+        drawText(ctx, textStroke);
+      }
+      return;
+    }
     
     // 符号工具：点击放置符号
     if (currentTool === 'symbol') {
@@ -266,6 +305,18 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(stroke.symbolChar, stroke.points[0].x, stroke.points[0].y);
+    ctx.restore();
+  };
+
+  const drawText = (ctx: CanvasRenderingContext2D, stroke: Stroke) => {
+    if (!stroke.text || stroke.points.length === 0) return;
+    
+    ctx.save();
+    ctx.font = `${stroke.fontSize || 24}px Arial`;
+    ctx.fillStyle = stroke.color;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(stroke.text, stroke.points[0].x, stroke.points[0].y);
     ctx.restore();
   };
 
@@ -417,6 +468,17 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
             title="橡皮擦"
           >
             <Eraser size={20} />
+          </button>
+          
+          {/* 文字工具 */}
+          <button
+            onClick={() => setCurrentTool('text')}
+            className={`p-2 rounded transition ${
+              currentTool === 'text' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+            }`}
+            title="文字工具"
+          >
+            <Type size={20} />
           </button>
           
           {/* 符号工具 - 悬停展开 */}
