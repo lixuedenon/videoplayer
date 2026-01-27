@@ -2,6 +2,8 @@ import React from 'react';
 import { ChevronDown, Upload } from 'lucide-react';
 
 export type ShapeType = 
+  // 画笔
+  | 'freepen'
   // 基础形状
   | 'circle' | 'rectangle' | 'roundRect' | 'diamond' | 'triangleUp' | 'triangleDown' 
   | 'triangleLeft' | 'triangleRight' | 'hexagon' | 'star'
@@ -32,6 +34,14 @@ interface ShapeSymbolPickerProps {
 
 // 35个形状完整定义
 const SHAPE_CATEGORIES = [
+  {
+    id: 'pen',
+    name: '画笔',
+    icon: '✏️',
+    shapes: [
+      { id: 'freepen', name: '自由画笔', type: 'freepen' as ShapeType, icon: '✏️' },
+    ]
+  },
   {
     id: 'basic',
     name: '基础形状',
