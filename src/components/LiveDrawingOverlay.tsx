@@ -124,7 +124,7 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
     if (isActive) {
       redrawAll();
     }
-  }, [strokes, isActive]);
+  }, [strokes, isActive, selectedStrokeIndex]);
 
   // 键盘事件：Delete删除选中
   useEffect(() => {
@@ -137,7 +137,6 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
         setSelectedStrokeIndex(null);
       } else if (e.key === 'Escape') {
         setSelectedStrokeIndex(null);
-        redrawAll();
       }
     };
     
@@ -152,6 +151,8 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+    
+    console.log('redrawAll called, selectedStrokeIndex:', selectedStrokeIndex);
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -240,14 +241,12 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
           setSelectedStrokeIndex(i);
           setIsDraggingStroke(true);
           setDragStartPoint(point);
-          redrawAll();
           return;
         }
       }
       
       // 点击空白，取消选择
       setSelectedStrokeIndex(null);
-      redrawAll();
       return;
     }
     
@@ -1063,7 +1062,9 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
 
   // 绘制选中控制框
   const drawSelectionBox = (ctx: CanvasRenderingContext2D, stroke: Stroke) => {
+    console.log('drawSelectionBox called, stroke:', stroke);
     const bbox = getStrokeBoundingBox(stroke);
+    console.log('bbox:', bbox);
     if (!bbox) return;
     
     const padding = 10;
