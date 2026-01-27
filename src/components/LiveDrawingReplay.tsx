@@ -58,11 +58,15 @@ export const LiveDrawingReplay: React.FC<LiveDrawingReplayProps> = ({
         // 符号类型：直接绘制符号
         if (stroke.tool === 'symbol' && stroke.symbolChar) {
           ctx.save();
+          ctx.translate(stroke.points[0].x, stroke.points[0].y);
+          if (stroke.symbolRotation) {
+            ctx.rotate((stroke.symbolRotation * Math.PI) / 180);
+          }
           ctx.font = `${stroke.symbolSize || 40}px Arial`;
           ctx.fillStyle = stroke.color;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          ctx.fillText(stroke.symbolChar, stroke.points[0].x, stroke.points[0].y);
+          ctx.fillText(stroke.symbolChar, 0, 0);
           ctx.restore();
           return;
         }
