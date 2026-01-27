@@ -35,6 +35,7 @@ interface Stroke {
   symbolId?: string;
   symbolChar?: string;
   symbolSize?: number;
+  symbolRotation?: number;
   // 文字相关（当tool='text'时使用）
   text?: string;
   fontSize?: number;
@@ -53,6 +54,8 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
   const [penWidth, setPenWidth] = useState(3);
   const [showSymbolPanel, setShowSymbolPanel] = useState(false);
   const [selectedSymbol, setSelectedSymbol] = useState<SymbolItem | null>(null);
+  const [symbolSize, setSymbolSize] = useState(3); // 1-5档，默认3
+  const [symbolRotation, setSymbolRotation] = useState(0); // 0-315度，45度一档
   const [strokes, setStrokes] = useState<Stroke[]>([]);
   const [currentStroke, setCurrentStroke] = useState<Point[]>([]);
   const [startTimestamp, setStartTimestamp] = useState<number>(0);
@@ -197,7 +200,8 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
         endTime: videoElement.currentTime - startTimestamp,
         symbolId: selectedSymbol.id,
         symbolChar: selectedSymbol.char,
-        symbolSize: 40 // 默认大小
+        symbolSize: [20, 30, 40, 50, 60][symbolSize - 1], // 5档大小
+        symbolRotation: symbolRotation // 旋转角度
       };
       
       setStrokes(prev => [...prev, symbolStroke]);
@@ -300,11 +304,15 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
     if (!stroke.symbolChar || stroke.points.length === 0) return;
     
     ctx.save();
+    ctx.translate(stroke.points[0].x, stroke.points[0].y);
+    if (stroke.symbolRotation) {
+      ctx.rotate((stroke.symbolRotation * Math.PI) / 180);
+    }
     ctx.font = `${stroke.symbolSize || 40}px Arial`;
     ctx.fillStyle = stroke.color;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(stroke.symbolChar, stroke.points[0].x, stroke.points[0].y);
+    ctx.fillText(stroke.symbolChar, 0, 0);
     ctx.restore();
   };
 
@@ -443,6 +451,22 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
+        onWheel={(e) => {
+          if (currentTool === 'symbol') {
+            e.preventDefault();
+            if (e.shiftKey) {
+              // Shift + 滚轮：旋转
+              const newRotation = symbolRotation + (e.deltaY > 0 ? 45 : -45);
+              setSymbolRotation((newRotation + 360) % 360);
+            } else {
+              // 单独滚轮：大小
+              const newSize = symbolSize + (e.deltaY > 0 ? -1 : 1);
+              if (newSize >= 1 && newSize <= 5) {
+                setSymbolSize(newSize);
+              }
+            }
+          }
+        }}
       />
 
       {/* 工具栏 */}
@@ -548,6 +572,13 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
         >
           <Save size={20} />
         </button>
+
+        {/* 符号工具状态提示 */}
+        {currentTool === 'symbol' && selectedSymbol && (
+          <div className="px-3 py-1 bg-blue-600 rounded text-white text-xs">
+            大小: {symbolSize}/5 | 旋转: {symbolRotation}°
+          </div>
+        )}
 
         {/* 关闭 */}
         <button
