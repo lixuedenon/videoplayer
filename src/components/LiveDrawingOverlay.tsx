@@ -2,7 +2,19 @@ import React, { useRef, useEffect, useState } from 'react';
 import { Paintbrush, Eraser, Trash2, Undo, Square, Save, Type } from 'lucide-react';
 import { CompactSymbolPicker } from './CompactSymbolPicker';
 import { ColorPicker } from './ColorPicker';
+import { ShapeSymbolPicker } from './ShapeSymbolPicker';
+import { CustomSymbolManager } from './CustomSymbolManager';
 import type { SymbolItem } from '../constants/symbols';
+import type { ShapeType } from './ShapeSymbolPicker';
+
+interface ShapeItem {
+  id: string;
+  name: string;
+  type: ShapeType;
+  icon: string;
+  category: string;
+}
+
 
 interface LiveDrawingOverlayProps {
   videoElement: HTMLVideoElement | null;
@@ -17,7 +29,7 @@ interface LiveDrawingOverlayProps {
   }) => void;
 }
 
-type DrawingTool = 'pen' | 'eraser' | 'symbol' | 'text';
+type DrawingTool = 'pen' | 'eraser' | 'symbol' | 'text' | 'shape';
 
 interface Point {
   x: number;
@@ -39,6 +51,9 @@ interface Stroke {
   // 文字相关（当tool='text'时使用）
   text?: string;
   fontSize?: number;
+  // 形状相关（当tool='shape'时使用）
+  shapeType?: ShapeType;
+  filled?: boolean;
 }
 
 export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
@@ -56,6 +71,9 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
   const [selectedSymbol, setSelectedSymbol] = useState<SymbolItem | null>(null);
   const [symbolSize, setSymbolSize] = useState(3); // 1-5档，默认3
   const [symbolRotation, setSymbolRotation] = useState(0); // 0-315度，45度一档
+  const [showShapePanel, setShowShapePanel] = useState(false);
+  const [selectedShape, setSelectedShape] = useState<ShapeItem | null>(null);
+  const [showCustomSymbolManager, setShowCustomSymbolManager] = useState(false);
   const [strokes, setStrokes] = useState<Stroke[]>([]);
   const [currentStroke, setCurrentStroke] = useState<Point[]>([]);
   const [startTimestamp, setStartTimestamp] = useState<number>(0);
@@ -300,6 +318,12 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
     // 不关闭面板，允许连续选择
   };
 
+  const handleShapeSelect = (shape: ShapeItem) => {
+    setCurrentTool('shape');
+    setSelectedShape(shape);
+    // 不关闭面板，允许连续选择
+  };
+
   const drawSymbol = (ctx: CanvasRenderingContext2D, stroke: Stroke) => {
     if (!stroke.symbolChar || stroke.points.length === 0) return;
     
@@ -511,6 +535,16 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
             onMouseEnter={() => setShowSymbolPanel(true)}
             onMouseLeave={() => setShowSymbolPanel(false)}
           />
+          
+          {/* 形状工具 - 悬停展开 */}
+          <ShapeSymbolPicker
+            isVisible={showShapePanel}
+            selectedShape={selectedShape}
+            onSelect={handleShapeSelect}
+            onMouseEnter={() => setShowShapePanel(true)}
+            onMouseLeave={() => setShowShapePanel(false)}
+            onUploadClick={() => setShowCustomSymbolManager(true)}
+          />
         </div>
 
         <div className="w-px h-6 bg-gray-600"></div>
@@ -642,6 +676,17 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
           </div>
         </div>
       )}
+
+      {/* 自定义符号管理器 */}
+      <CustomSymbolManager
+        isOpen={showCustomSymbolManager}
+        onClose={() => setShowCustomSymbolManager(false)}
+        onSelect={(symbol) => {
+          // 使用自定义符号
+          console.log('选择自定义符号:', symbol);
+          setShowCustomSymbolManager(false);
+        }}
+      />
     </div>
   );
 };
