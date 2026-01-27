@@ -36,10 +36,10 @@ export const CompactSymbolPicker: React.FC<CompactSymbolPickerProps> = ({
         <ChevronDown size={14} />
       </button>
 
-      {/* 悬停展开的符号面板 - 向上展开，右对齐，面板也响应悬停 */}
+      {/* 悬停展开的符号面板 - 向上展开，左对齐，无间隙 */}
       {isVisible && (
         <div 
-          className="absolute bottom-full right-0 mb-1 bg-gray-800 rounded-lg shadow-2xl border border-gray-700 p-3 z-50 w-[340px] max-h-[420px] overflow-y-auto"
+          className="absolute bottom-full left-0 bg-gray-800 rounded-lg shadow-2xl border border-gray-700 p-3 z-50 w-[340px] max-h-[420px] overflow-y-auto"
           onMouseEnter={onMouseEnter}
           onMouseLeave={onMouseLeave}
         >
