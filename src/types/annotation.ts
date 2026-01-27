@@ -39,7 +39,7 @@ export interface DrawingData {
 
 // 动态涂鸦的时间轴笔画
 export interface LiveStroke {
-  tool: 'pen' | 'eraser' | 'symbol' | 'text';
+  tool: 'pen' | 'eraser' | 'symbol' | 'text' | 'shape';
   color: string;
   width: number;
   points: Point[];
@@ -49,9 +49,13 @@ export interface LiveStroke {
   symbolId?: string;
   symbolChar?: string;
   symbolSize?: number;
+  symbolRotation?: number;
   // 文字相关字段
   text?: string;
   fontSize?: number;
+  // 形状相关字段
+  shapeType?: 'circle' | 'rectangle' | 'line' | 'arrow' | 'triangle' | 'star' | 'hexagon' | 'diamond' | 'roundRect';
+  filled?: boolean;
 }
 
 // 动态涂鸦数据
