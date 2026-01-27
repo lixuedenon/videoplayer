@@ -74,6 +74,8 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
   const [showShapePanel, setShowShapePanel] = useState(false);
   const [selectedShape, setSelectedShape] = useState<ShapeItem | null>(null);
   const [showCustomSymbolManager, setShowCustomSymbolManager] = useState(false);
+  const [isShapeDrawing, setIsShapeDrawing] = useState(false);
+  const [shapeStartPoint, setShapeStartPoint] = useState<Point | null>(null);
   const [strokes, setStrokes] = useState<Stroke[]>([]);
   const [currentStroke, setCurrentStroke] = useState<Point[]>([]);
   const [startTimestamp, setStartTimestamp] = useState<number>(0);
@@ -131,6 +133,16 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
       // 符号类型：使用drawSymbol绘制
       if (stroke.tool === 'symbol') {
         drawSymbol(ctx, stroke);
+        return;
+      }
+      
+      // 形状类型：使用drawShape绘制
+      if (stroke.tool === 'shape' && stroke.shapeType && stroke.points.length >= 2) {
+        drawShape(ctx, stroke.shapeType, stroke.points[0], stroke.points[1], {
+          color: stroke.color,
+          width: stroke.width,
+          filled: stroke.filled || false
+        });
         return;
       }
       
@@ -205,6 +217,14 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
       return;
     }
     
+    // 形状工具：开始拖拽绘制
+    if (currentTool === 'shape') {
+      if (!selectedShape || !videoElement) return;
+      setIsShapeDrawing(true);
+      setShapeStartPoint(point);
+      return;
+    }
+    
     // 符号工具：点击放置符号
     if (currentTool === 'symbol') {
       if (!selectedSymbol || !videoElement) return;
@@ -244,9 +264,30 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const point = getCanvasCoordinates(e);
+    
+    // 形状拖拽预览
+    if (isShapeDrawing && shapeStartPoint && selectedShape) {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      
+      // 重绘所有已有stroke
+      redrawCanvas();
+      
+      // 绘制预览形状
+      drawShape(ctx, selectedShape.type, shapeStartPoint, point, {
+        color: penColor,
+        width: penWidth,
+        filled: false
+      });
+      return;
+    }
+    
+    // 画笔/橡皮擦
     if (!isDrawing) return;
 
-    const point = getCanvasCoordinates(e);
     const newStroke = [...currentStroke, point];
     setCurrentStroke(newStroke);
 
@@ -278,7 +319,32 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
     ctx.globalCompositeOperation = 'source-over';
   };
 
-  const handleMouseUp = () => {
+  const handleMouseUp = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const point = getCanvasCoordinates(e);
+    
+    // 形状拖拽完成
+    if (isShapeDrawing && shapeStartPoint && selectedShape && videoElement) {
+      const shapeStroke: Stroke = {
+        tool: 'shape',
+        color: penColor,
+        width: penWidth,
+        points: [shapeStartPoint, point],
+        startTime: videoElement.currentTime - startTimestamp,
+        endTime: videoElement.currentTime - startTimestamp,
+        shapeType: selectedShape.type,
+        filled: false
+      };
+      
+      setStrokes(prev => [...prev, shapeStroke]);
+      setIsShapeDrawing(false);
+      setShapeStartPoint(null);
+      
+      // 重绘
+      redrawCanvas();
+      return;
+    }
+    
+    // 画笔/橡皮擦
     if (!isDrawing) return;
 
     setIsDrawing(false);
@@ -319,9 +385,13 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
   };
 
   const handleShapeSelect = (shape: ShapeItem) => {
-    setCurrentTool('shape');
-    setSelectedShape(shape);
-    // 不关闭面板，允许连续选择
+    if (shape.type === 'freepen') {
+      setCurrentTool('pen');
+      setSelectedShape(null);
+    } else {
+      setCurrentTool('shape');
+      setSelectedShape(shape);
+    }
   };
 
   const drawSymbol = (ctx: CanvasRenderingContext2D, stroke: Stroke) => {
@@ -349,6 +419,126 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
     ctx.fillText(stroke.text, stroke.points[0].x, stroke.points[0].y);
+    ctx.restore();
+  };
+
+  const redrawCanvas = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    strokes.forEach(stroke => {
+      if (stroke.tool === 'text') {
+        drawText(ctx, stroke);
+      } else if (stroke.tool === 'symbol') {
+        drawSymbol(ctx, stroke);
+      } else if (stroke.tool === 'shape' && stroke.shapeType) {
+        drawShape(ctx, stroke.shapeType, stroke.points[0], stroke.points[1], {
+          color: stroke.color,
+          width: stroke.width,
+          filled: stroke.filled || false
+        });
+      } else if (stroke.points.length >= 2) {
+        // 画笔/橡皮擦
+        ctx.strokeStyle = stroke.color;
+        ctx.lineWidth = stroke.width;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        if (stroke.tool === 'eraser') {
+          ctx.globalCompositeOperation = 'destination-out';
+        } else {
+          ctx.globalCompositeOperation = 'source-over';
+        }
+        ctx.beginPath();
+        ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+        for (let i = 1; i < stroke.points.length; i++) {
+          ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
+        }
+        ctx.stroke();
+        ctx.globalCompositeOperation = 'source-over';
+      }
+    });
+  };
+
+  const drawShape = (ctx: CanvasRenderingContext2D, shapeType: ShapeType, start: Point, end: Point, options: { color: string; width: number; filled: boolean }) => {
+    ctx.save();
+    ctx.strokeStyle = options.color;
+    ctx.fillStyle = options.color;
+    ctx.lineWidth = options.width;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    
+    const width = end.x - start.x;
+    const height = end.y - start.y;
+    
+    switch (shapeType) {
+      case 'circle': {
+        const centerX = (start.x + end.x) / 2;
+        const centerY = (start.y + end.y) / 2;
+        const radius = Math.sqrt(width * width + height * height) / 2;
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+        options.filled ? ctx.fill() : ctx.stroke();
+        break;
+      }
+      case 'rectangle': {
+        ctx.beginPath();
+        ctx.rect(start.x, start.y, width, height);
+        options.filled ? ctx.fill() : ctx.stroke();
+        break;
+      }
+      case 'line':
+      case 'horizontal':
+      case 'vertical': {
+        ctx.beginPath();
+        ctx.moveTo(start.x, start.y);
+        if (shapeType === 'horizontal') {
+          ctx.lineTo(end.x, start.y);
+        } else if (shapeType === 'vertical') {
+          ctx.lineTo(start.x, end.y);
+        } else {
+          ctx.lineTo(end.x, end.y);
+        }
+        ctx.stroke();
+        break;
+      }
+      case 'arrowRight': {
+        const angle = Math.atan2(end.y - start.y, end.x - start.x);
+        const arrowLength = 15;
+        ctx.beginPath();
+        ctx.moveTo(start.x, start.y);
+        ctx.lineTo(end.x, end.y);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(end.x, end.y);
+        ctx.lineTo(end.x - arrowLength * Math.cos(angle - Math.PI / 6), end.y - arrowLength * Math.sin(angle - Math.PI / 6));
+        ctx.moveTo(end.x, end.y);
+        ctx.lineTo(end.x - arrowLength * Math.cos(angle + Math.PI / 6), end.y - arrowLength * Math.sin(angle + Math.PI / 6));
+        ctx.stroke();
+        break;
+      }
+      case 'triangleUp': {
+        const centerX = (start.x + end.x) / 2;
+        ctx.beginPath();
+        ctx.moveTo(centerX, start.y);
+        ctx.lineTo(start.x, end.y);
+        ctx.lineTo(end.x, end.y);
+        ctx.closePath();
+        options.filled ? ctx.fill() : ctx.stroke();
+        break;
+      }
+      // TODO: 其他30个形状待实现
+      default: {
+        // 默认画矩形
+        ctx.beginPath();
+        ctx.rect(start.x, start.y, width, height);
+        ctx.stroke();
+      }
+    }
+    
     ctx.restore();
   };
 
@@ -495,17 +685,16 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
 
       {/* 工具栏 */}
       <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-gray-900 bg-opacity-90 rounded-lg shadow-2xl border border-gray-700 p-3 flex items-center gap-4">
-        {/* 画笔/橡皮擦 */}
+        {/* 画笔（含形状） */}
         <div className="flex gap-2">
-          <button
-            onClick={() => setCurrentTool('pen')}
-            className={`p-2 rounded transition ${
-              currentTool === 'pen' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-            }`}
-            title="画笔"
-          >
-            <Paintbrush size={20} />
-          </button>
+          <ShapeSymbolPicker
+            isVisible={showShapePanel}
+            selectedShape={selectedShape}
+            onSelect={handleShapeSelect}
+            onMouseEnter={() => setShowShapePanel(true)}
+            onMouseLeave={() => setShowShapePanel(false)}
+            onUploadClick={() => setShowCustomSymbolManager(true)}
+          />
           <button
             onClick={() => setCurrentTool('eraser')}
             className={`p-2 rounded transition ${
@@ -534,16 +723,6 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
             onSelect={handleSymbolSelect}
             onMouseEnter={() => setShowSymbolPanel(true)}
             onMouseLeave={() => setShowSymbolPanel(false)}
-          />
-          
-          {/* 形状工具 - 悬停展开 */}
-          <ShapeSymbolPicker
-            isVisible={showShapePanel}
-            selectedShape={selectedShape}
-            onSelect={handleShapeSelect}
-            onMouseEnter={() => setShowShapePanel(true)}
-            onMouseLeave={() => setShowShapePanel(false)}
-            onUploadClick={() => setShowCustomSymbolManager(true)}
           />
         </div>
 
