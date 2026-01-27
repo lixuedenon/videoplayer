@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Paintbrush, Eraser, Trash2, Undo, Square, Save, Type } from 'lucide-react';
+import { Paintbrush, Eraser, Trash2, Undo, Square, Save, Type, MousePointer } from 'lucide-react';
 import { CompactSymbolPicker } from './CompactSymbolPicker';
 import { ColorPicker } from './ColorPicker';
 import { ShapeSymbolPicker } from './ShapeSymbolPicker';
@@ -29,7 +29,7 @@ interface LiveDrawingOverlayProps {
   }) => void;
 }
 
-type DrawingTool = 'pen' | 'eraser' | 'symbol' | 'text' | 'shape';
+type DrawingTool = 'pen' | 'eraser' | 'symbol' | 'text' | 'shape' | 'select';
 
 interface Point {
   x: number;
@@ -83,6 +83,12 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [showNameDialog, setShowNameDialog] = useState(false);
   const [inputName, setInputName] = useState('');
+  
+  // 选择工具相关状态
+  const [selectedStrokeIndex, setSelectedStrokeIndex] = useState<number | null>(null);
+  const [isDraggingStroke, setIsDraggingStroke] = useState(false);
+  const [dragStartPoint, setDragStartPoint] = useState<Point | null>(null);
+  const [activeControlPoint, setActiveControlPoint] = useState<string | null>(null); // 'tl', 'tr', 'bl', 'br', 'tm', 'bm', 'ml', 'mr', 'rotate'
 
   // 初始化开始时间
   useEffect(() => {
@@ -119,6 +125,25 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
       redrawAll();
     }
   }, [strokes, isActive]);
+
+  // 键盘事件：Delete删除选中
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!isActive) return;
+      
+      if (e.key === 'Delete' && selectedStrokeIndex !== null) {
+        const newStrokes = strokes.filter((_, index) => index !== selectedStrokeIndex);
+        setStrokes(newStrokes);
+        setSelectedStrokeIndex(null);
+      } else if (e.key === 'Escape') {
+        setSelectedStrokeIndex(null);
+        redrawAll();
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isActive, selectedStrokeIndex, strokes]);
 
   // 重绘所有笔画
   const redrawAll = () => {
@@ -194,6 +219,37 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
 
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const point = getCanvasCoordinates(e);
+    
+    // 选择工具：点击选中或操作控制点
+    if (currentTool === 'select') {
+      // 检查是否点击了控制点
+      if (selectedStrokeIndex !== null) {
+        const selectedStroke = strokes[selectedStrokeIndex];
+        const controlPoint = getControlPointAtPosition(point, selectedStroke);
+        
+        if (controlPoint) {
+          setActiveControlPoint(controlPoint);
+          setDragStartPoint(point);
+          return;
+        }
+      }
+      
+      // 检查是否点击了某个stroke
+      for (let i = strokes.length - 1; i >= 0; i--) {
+        if (isPointInStroke(point, strokes[i])) {
+          setSelectedStrokeIndex(i);
+          setIsDraggingStroke(true);
+          setDragStartPoint(point);
+          redrawAll();
+          return;
+        }
+      }
+      
+      // 点击空白，取消选择
+      setSelectedStrokeIndex(null);
+      redrawAll();
+      return;
+    }
     
     // 文字工具：点击输入文字
     if (currentTool === 'text') {
@@ -273,6 +329,72 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const point = getCanvasCoordinates(e);
     
+    // 选择工具：拖拽移动或变换
+    if (currentTool === 'select' && selectedStrokeIndex !== null && dragStartPoint) {
+      const dx = point.x - dragStartPoint.x;
+      const dy = point.y - dragStartPoint.y;
+      
+      const selectedStroke = strokes[selectedStrokeIndex];
+      
+      if (activeControlPoint) {
+        // 操作控制点：缩放/旋转
+        const newStroke = { ...selectedStroke };
+        
+        if (activeControlPoint === 'rotate') {
+          // 旋转逻辑（暂时简化）
+          // TODO: 实现旋转
+        } else {
+          // 缩放/拉伸
+          if (newStroke.tool === 'shape' && newStroke.points.length >= 2) {
+            const [p1, p2] = newStroke.points;
+            let newP1 = { ...p1 };
+            let newP2 = { ...p2 };
+            
+            switch (activeControlPoint) {
+              case 'tl': newP1 = { x: p1.x + dx, y: p1.y + dy }; break;
+              case 'tr': newP2 = { x: p2.x + dx, y: p1.y + dy }; newP1.y = p1.y + dy; break;
+              case 'bl': newP1 = { x: p1.x + dx, y: p1.y }; newP2.y = p2.y + dy; break;
+              case 'br': newP2 = { x: p2.x + dx, y: p2.y + dy }; break;
+              case 'tm': newP1.y = p1.y + dy; break;
+              case 'bm': newP2.y = p2.y + dy; break;
+              case 'ml': newP1.x = p1.x + dx; break;
+              case 'mr': newP2.x = p2.x + dx; break;
+            }
+            
+            newStroke.points = [newP1, newP2];
+          } else if (newStroke.tool === 'text' || newStroke.tool === 'symbol') {
+            // 文字/符号缩放：改变大小
+            const scaleFactor = 1 + (dx + dy) / 100;
+            if (newStroke.tool === 'text') {
+              newStroke.fontSize = Math.max(12, (newStroke.fontSize || 24) * scaleFactor);
+            } else {
+              newStroke.symbolSize = Math.max(20, (newStroke.symbolSize || 40) * scaleFactor);
+            }
+          }
+        }
+        
+        const newStrokes = [...strokes];
+        newStrokes[selectedStrokeIndex] = newStroke;
+        setStrokes(newStrokes);
+        setDragStartPoint(point);
+        
+      } else if (isDraggingStroke) {
+        // 移动整个stroke
+        const newStroke = { ...selectedStroke };
+        newStroke.points = selectedStroke.points.map(p => ({
+          x: p.x + dx,
+          y: p.y + dy
+        }));
+        
+        const newStrokes = [...strokes];
+        newStrokes[selectedStrokeIndex] = newStroke;
+        setStrokes(newStrokes);
+        setDragStartPoint(point);
+      }
+      
+      return;
+    }
+    
     // 形状拖拽预览
     if (isShapeDrawing && shapeStartPoint && selectedShape) {
       const canvas = canvasRef.current;
@@ -328,6 +450,14 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
 
   const handleMouseUp = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const point = getCanvasCoordinates(e);
+    
+    // 选择工具：结束拖拽
+    if (currentTool === 'select') {
+      setIsDraggingStroke(false);
+      setActiveControlPoint(null);
+      setDragStartPoint(null);
+      return;
+    }
     
     // 形状拖拽完成
     if (isShapeDrawing && shapeStartPoint && selectedShape && videoElement) {
@@ -467,6 +597,11 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
         ctx.globalCompositeOperation = 'source-over';
       }
     });
+    
+    // 绘制选中框
+    if (selectedStrokeIndex !== null && selectedStrokeIndex < strokes.length) {
+      drawSelectionBox(ctx, strokes[selectedStrokeIndex]);
+    }
   };
 
   const drawShape = (ctx: CanvasRenderingContext2D, shapeType: ShapeType, start: Point, end: Point, options: { color: string; width: number; filled: boolean }) => {
@@ -844,6 +979,176 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
     ctx.restore();
   };
 
+  // 检测点击是否在stroke边界内
+  const isPointInStroke = (point: Point, stroke: Stroke): boolean => {
+    if (stroke.tool === 'text' || stroke.tool === 'symbol') {
+      // 文字/符号：检测点是否在范围内
+      if (stroke.points.length === 0) return false;
+      const p = stroke.points[0];
+      const size = stroke.tool === 'text' ? (stroke.fontSize || 24) : (stroke.symbolSize || 40);
+      return Math.abs(point.x - p.x) < size * 2 && Math.abs(point.y - p.y) < size;
+    } else if (stroke.tool === 'shape' && stroke.points.length >= 2) {
+      // 形状：检测点是否在边界框内
+      const [p1, p2] = stroke.points;
+      const minX = Math.min(p1.x, p2.x) - 10;
+      const maxX = Math.max(p1.x, p2.x) + 10;
+      const minY = Math.min(p1.y, p2.y) - 10;
+      const maxY = Math.max(p1.y, p2.y) + 10;
+      return point.x >= minX && point.x <= maxX && point.y >= minY && point.y <= maxY;
+    } else if (stroke.points.length >= 2) {
+      // 画笔/橡皮：检测点是否接近路径
+      for (let i = 0; i < stroke.points.length - 1; i++) {
+        const p1 = stroke.points[i];
+        const p2 = stroke.points[i + 1];
+        const dist = distanceToLineSegment(point, p1, p2);
+        if (dist < stroke.width + 5) return true;
+      }
+    }
+    return false;
+  };
+
+  // 计算点到线段的距离
+  const distanceToLineSegment = (point: Point, p1: Point, p2: Point): number => {
+    const A = point.x - p1.x;
+    const B = point.y - p1.y;
+    const C = p2.x - p1.x;
+    const D = p2.y - p1.y;
+    const dot = A * C + B * D;
+    const lenSq = C * C + D * D;
+    let param = -1;
+    if (lenSq !== 0) param = dot / lenSq;
+    
+    let xx, yy;
+    if (param < 0) {
+      xx = p1.x;
+      yy = p1.y;
+    } else if (param > 1) {
+      xx = p2.x;
+      yy = p2.y;
+    } else {
+      xx = p1.x + param * C;
+      yy = p1.y + param * D;
+    }
+    
+    const dx = point.x - xx;
+    const dy = point.y - yy;
+    return Math.sqrt(dx * dx + dy * dy);
+  };
+
+  // 获取stroke的边界框
+  const getStrokeBoundingBox = (stroke: Stroke): { x: number; y: number; width: number; height: number } | null => {
+    if (stroke.tool === 'text' || stroke.tool === 'symbol') {
+      if (stroke.points.length === 0) return null;
+      const p = stroke.points[0];
+      const size = stroke.tool === 'text' ? (stroke.fontSize || 24) : (stroke.symbolSize || 40);
+      return { x: p.x - size, y: p.y - size / 2, width: size * 4, height: size * 1.5 };
+    } else if (stroke.tool === 'shape' && stroke.points.length >= 2) {
+      const [p1, p2] = stroke.points;
+      const x = Math.min(p1.x, p2.x);
+      const y = Math.min(p1.y, p2.y);
+      const width = Math.abs(p2.x - p1.x);
+      const height = Math.abs(p2.y - p1.y);
+      return { x, y, width, height };
+    } else if (stroke.points.length >= 2) {
+      const xs = stroke.points.map(p => p.x);
+      const ys = stroke.points.map(p => p.y);
+      const minX = Math.min(...xs);
+      const maxX = Math.max(...xs);
+      const minY = Math.min(...ys);
+      const maxY = Math.max(...ys);
+      return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+    }
+    return null;
+  };
+
+  // 绘制选中控制框
+  const drawSelectionBox = (ctx: CanvasRenderingContext2D, stroke: Stroke) => {
+    const bbox = getStrokeBoundingBox(stroke);
+    if (!bbox) return;
+    
+    const padding = 10;
+    const x = bbox.x - padding;
+    const y = bbox.y - padding;
+    const w = bbox.width + padding * 2;
+    const h = bbox.height + padding * 2;
+    
+    // 绘制虚线边框
+    ctx.save();
+    ctx.strokeStyle = '#3B82F6';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 5]);
+    ctx.strokeRect(x, y, w, h);
+    ctx.setLineDash([]);
+    
+    // 绘制8个控制点
+    const controlSize = 8;
+    const points = [
+      { id: 'tl', x: x, y: y },                           // 左上
+      { id: 'tm', x: x + w / 2, y: y },                   // 上中
+      { id: 'tr', x: x + w, y: y },                       // 右上
+      { id: 'ml', x: x, y: y + h / 2 },                   // 左中
+      { id: 'mr', x: x + w, y: y + h / 2 },               // 右中
+      { id: 'bl', x: x, y: y + h },                       // 左下
+      { id: 'bm', x: x + w / 2, y: y + h },               // 下中
+      { id: 'br', x: x + w, y: y + h },                   // 右下
+    ];
+    
+    ctx.fillStyle = '#FFFFFF';
+    ctx.strokeStyle = '#3B82F6';
+    ctx.lineWidth = 2;
+    
+    points.forEach(point => {
+      ctx.fillRect(point.x - controlSize / 2, point.y - controlSize / 2, controlSize, controlSize);
+      ctx.strokeRect(point.x - controlSize / 2, point.y - controlSize / 2, controlSize, controlSize);
+    });
+    
+    // 绘制旋转手柄
+    const rotateHandleY = y - 30;
+    ctx.beginPath();
+    ctx.moveTo(x + w / 2, y);
+    ctx.lineTo(x + w / 2, rotateHandleY + 10);
+    ctx.stroke();
+    
+    ctx.beginPath();
+    ctx.arc(x + w / 2, rotateHandleY, 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    
+    ctx.restore();
+  };
+
+  // 检测点击的控制点
+  const getControlPointAtPosition = (point: Point, stroke: Stroke): string | null => {
+    const bbox = getStrokeBoundingBox(stroke);
+    if (!bbox) return null;
+    
+    const padding = 10;
+    const x = bbox.x - padding;
+    const y = bbox.y - padding;
+    const w = bbox.width + padding * 2;
+    const h = bbox.height + padding * 2;
+    const hitRadius = 10;
+    
+    const points = [
+      { id: 'tl', x: x, y: y },
+      { id: 'tm', x: x + w / 2, y: y },
+      { id: 'tr', x: x + w, y: y },
+      { id: 'ml', x: x, y: y + h / 2 },
+      { id: 'mr', x: x + w, y: y + h / 2 },
+      { id: 'bl', x: x, y: y + h },
+      { id: 'bm', x: x + w / 2, y: y + h },
+      { id: 'br', x: x + w, y: y + h },
+      { id: 'rotate', x: x + w / 2, y: y - 30 },
+    ];
+    
+    for (const cp of points) {
+      const dist = Math.sqrt(Math.pow(point.x - cp.x, 2) + Math.pow(point.y - cp.y, 2));
+      if (dist < hitRadius) return cp.id;
+    }
+    
+    return null;
+  };
+
   const handleUndo = () => {
     if (strokes.length === 0) return;
 
@@ -1005,6 +1310,20 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
             title="橡皮擦"
           >
             <Eraser size={20} />
+          </button>
+          
+          {/* 选择工具 */}
+          <button
+            onClick={() => {
+              setCurrentTool('select');
+              setSelectedStrokeIndex(null);
+            }}
+            className={`p-2 rounded transition ${
+              currentTool === 'select' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+            }`}
+            title="选择工具（点击选中形状，拖拽控制点调整）"
+          >
+            <MousePointer size={20} />
           </button>
           
           {/* 文字工具 */}
