@@ -678,21 +678,61 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
         break;
       }
       
-      // 标注类（简化实现）
-      case 'cloud':
-      case 'speech':
-      case 'thought': {
-        // 简化为圆角矩形 + 小尾巴
+      // 标注类
+      case 'cloud': {
+        // 云形：波浪边框
+        const radius = Math.min(Math.abs(width), Math.abs(height)) / 8;
+        const numArcs = 8;
+        ctx.beginPath();
+        for (let i = 0; i <= numArcs; i++) {
+          const angle = (i / numArcs) * Math.PI * 2;
+          const x = centerX + (Math.abs(width) / 2) * Math.cos(angle) + radius * Math.cos(angle * 3);
+          const y = centerY + (Math.abs(height) / 2) * Math.sin(angle) + radius * Math.sin(angle * 3);
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.stroke();
+        break;
+      }
+      case 'speech': {
+        // 对话框：圆角矩形 + 三角尾巴（左下）
         const radius = 10;
+        const mainWidth = width * 0.9;
+        const mainHeight = height * 0.8;
         ctx.beginPath();
-        ctx.roundRect(start.x, start.y, width * 0.9, height * 0.8, radius);
+        ctx.roundRect(start.x, start.y, mainWidth, mainHeight, radius);
         ctx.stroke();
-        // 尾巴
+        // 三角尾巴
         ctx.beginPath();
-        ctx.moveTo(start.x + width * 0.2, start.y + height * 0.8);
-        ctx.lineTo(start.x + width * 0.1, end.y);
-        ctx.lineTo(start.x + width * 0.4, start.y + height * 0.8);
+        ctx.moveTo(start.x + mainWidth * 0.2, start.y + mainHeight);
+        ctx.lineTo(start.x + mainWidth * 0.1, end.y);
+        ctx.lineTo(start.x + mainWidth * 0.35, start.y + mainHeight);
+        ctx.closePath();
+        ctx.fill();
+        break;
+      }
+      case 'thought': {
+        // 思考泡：圆角矩形 + 三个小圆圈
+        const radius = 10;
+        const mainWidth = width * 0.9;
+        const mainHeight = height * 0.75;
+        ctx.beginPath();
+        ctx.roundRect(start.x, start.y, mainWidth, mainHeight, radius);
         ctx.stroke();
+        // 三个小圆圈（从大到小）
+        const bubble1R = Math.abs(width) * 0.08;
+        const bubble2R = Math.abs(width) * 0.05;
+        const bubble3R = Math.abs(width) * 0.03;
+        ctx.beginPath();
+        ctx.arc(start.x + mainWidth * 0.15, start.y + mainHeight + bubble1R * 2, bubble1R, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(start.x + mainWidth * 0.08, start.y + mainHeight + bubble1R * 3.5, bubble2R, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(start.x + mainWidth * 0.03, end.y - bubble3R, bubble3R, 0, Math.PI * 2);
+        ctx.fill();
         break;
       }
       case 'dashedBox': {
