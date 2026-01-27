@@ -36,9 +36,13 @@ export const CompactSymbolPicker: React.FC<CompactSymbolPickerProps> = ({
         <ChevronDown size={14} />
       </button>
 
-      {/* 悬停展开的符号面板 - 向上展开 */}
+      {/* 悬停展开的符号面板 - 向上展开，右对齐，面板也响应悬停 */}
       {isVisible && (
-        <div className="absolute bottom-full right-0 mb-1 bg-gray-800 rounded-lg shadow-2xl border border-gray-700 p-3 z-50 w-[360px] max-h-[400px] overflow-y-auto">
+        <div 
+          className="absolute bottom-full right-0 mb-1 bg-gray-800 rounded-lg shadow-2xl border border-gray-700 p-3 z-50 w-[340px] max-h-[420px] overflow-y-auto"
+          onMouseEnter={onMouseEnter}
+          onMouseLeave={onMouseLeave}
+        >
           {SYMBOL_CATEGORIES.map(category => (
             <div key={category.id} className="mb-3 last:mb-0">
               {/* 分类标题 */}
@@ -48,7 +52,7 @@ export const CompactSymbolPicker: React.FC<CompactSymbolPickerProps> = ({
               </div>
               
               {/* 符号网格 - 紧凑布局 */}
-              <div className="grid grid-cols-12 gap-1">
+              <div className="grid grid-cols-10 gap-1">
                 {category.symbols.map(symbol => (
                   <button
                     key={symbol.id}
