@@ -38,7 +38,6 @@ interface Stroke {
   text?: string;
   fontSize?: number;
 }
-}
 
 export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
   videoElement,
