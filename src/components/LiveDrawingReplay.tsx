@@ -43,6 +43,18 @@ export const LiveDrawingReplay: React.FC<LiveDrawingReplayProps> = ({
         // 只绘制已经开始的笔画
         if (relativeTime < stroke.startTime) return;
 
+        // 文字类型：直接绘制文字
+        if (stroke.tool === 'text' && stroke.text) {
+          ctx.save();
+          ctx.font = `${stroke.fontSize || 24}px Arial`;
+          ctx.fillStyle = stroke.color;
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'top';
+          ctx.fillText(stroke.text, stroke.points[0].x, stroke.points[0].y);
+          ctx.restore();
+          return;
+        }
+
         // 符号类型：直接绘制符号
         if (stroke.tool === 'symbol' && stroke.symbolChar) {
           ctx.save();
