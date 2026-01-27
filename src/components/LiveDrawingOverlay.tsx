@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { Paintbrush, Eraser, Trash2, Undo, Square, Save, Type } from 'lucide-react';
 import { CompactSymbolPicker } from './CompactSymbolPicker';
+import { ColorPicker } from './ColorPicker';
 import type { SymbolItem } from '../constants/symbols';
 
 interface LiveDrawingOverlayProps {
@@ -432,8 +433,6 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
 
   if (!isActive) return null;
 
-  const colors = ['#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF', '#FFFFFF', '#000000'];
-
   return (
     <div className="absolute inset-0 z-30">
       {/* 绘图画布 */}
@@ -492,22 +491,11 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
 
         <div className="w-px h-6 bg-gray-600"></div>
 
-        {/* 颜色选择 */}
-        {currentTool === 'pen' && (
-          <div className="flex gap-1">
-            {colors.map(color => (
-              <button
-                key={color}
-                onClick={() => setPenColor(color)}
-                className={`w-6 h-6 rounded border-2 transition ${
-                  penColor === color ? 'border-white scale-110' : 'border-gray-600'
-                }`}
-                style={{ backgroundColor: color }}
-                title={color}
-              />
-            ))}
-          </div>
-        )}
+        {/* 颜色选择 - 所有工具共用 */}
+        <ColorPicker
+          selectedColor={penColor}
+          onColorChange={setPenColor}
+        />
 
         <div className="w-px h-6 bg-gray-600"></div>
 
