@@ -39,12 +39,19 @@ export interface DrawingData {
 
 // 动态涂鸦的时间轴笔画
 export interface LiveStroke {
-  tool: 'pen' | 'eraser';
+  tool: 'pen' | 'eraser' | 'symbol' | 'text';
   color: string;
   width: number;
   points: Point[];
   startTime: number;  // 相对于标注开始的时间（秒）
   endTime: number;    // 笔画完成时间
+  // 符号相关字段
+  symbolId?: string;
+  symbolChar?: string;
+  symbolSize?: number;
+  // 文字相关字段
+  text?: string;
+  fontSize?: number;
 }
 
 // 动态涂鸦数据
