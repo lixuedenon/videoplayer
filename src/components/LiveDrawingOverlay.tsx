@@ -743,10 +743,13 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
   const drawShape = (ctx: CanvasRenderingContext2D, shapeType: ShapeType, start: Point, end: Point, options: { color: string; width: number; filled: boolean; rotation?: number }) => {
     ctx.save();
     
+    const width = end.x - start.x;
+    const height = end.y - start.y;
+    const centerX = (start.x + end.x) / 2;
+    const centerY = (start.y + end.y) / 2;
+    
     // 如果有旋转，应用旋转变换
     if (options.rotation) {
-      const centerX = (start.x + end.x) / 2;
-      const centerY = (start.y + end.y) / 2;
       ctx.translate(centerX, centerY);
       ctx.rotate(options.rotation * Math.PI / 180);
       ctx.translate(-centerX, -centerY);
@@ -757,11 +760,6 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
     ctx.lineWidth = options.width;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    
-    const width = end.x - start.x;
-    const height = end.y - start.y;
-    const centerX = (start.x + end.x) / 2;
-    const centerY = (start.y + end.y) / 2;
     
     switch (shapeType) {
       // 基础形状
