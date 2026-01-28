@@ -379,7 +379,7 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
     console.log('handleMouseMove:', {
       currentTool,
       selectedStrokeIndex,
-      dragStartPoint,
+      dragStartPoint: dragStartPoint ? `{x:${dragStartPoint.x}, y:${dragStartPoint.y}}` : null,
       activeControlPoint
     });
     
@@ -760,7 +760,8 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
     const centerY = (start.y + end.y) / 2;
     
     // 如果有旋转，应用旋转变换
-    if (options.rotation) {
+    console.log('drawShape rotation检查:', options.rotation, typeof options.rotation);
+    if (options.rotation !== undefined && options.rotation !== 0) {
       console.log('应用旋转:', options.rotation, '度');
       ctx.translate(centerX, centerY);
       ctx.rotate(options.rotation * Math.PI / 180);
