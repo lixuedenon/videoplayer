@@ -151,8 +151,6 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    
-    console.log('redrawAll called, selectedStrokeIndex:', selectedStrokeIndex);
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -334,18 +332,17 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
       const dy = point.y - dragStartPoint.y;
       
       const selectedStroke = strokes[selectedStrokeIndex];
+      let previewStroke = { ...selectedStroke };
       
       if (activeControlPoint) {
         // 操作控制点：缩放/旋转
-        const newStroke = { ...selectedStroke };
-        
         if (activeControlPoint === 'rotate') {
           // 旋转逻辑（暂时简化）
           // TODO: 实现旋转
         } else {
           // 缩放/拉伸
-          if (newStroke.tool === 'shape' && newStroke.points.length >= 2) {
-            const [p1, p2] = newStroke.points;
+          if (previewStroke.tool === 'shape' && previewStroke.points.length >= 2) {
+            const [p1, p2] = previewStroke.points;
             let newP1 = { ...p1 };
             let newP2 = { ...p2 };
             
@@ -360,35 +357,59 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
               case 'mr': newP2.x = p2.x + dx; break;
             }
             
-            newStroke.points = [newP1, newP2];
-          } else if (newStroke.tool === 'text' || newStroke.tool === 'symbol') {
+            previewStroke.points = [newP1, newP2];
+          } else if (previewStroke.tool === 'text' || previewStroke.tool === 'symbol') {
             // 文字/符号缩放：改变大小
             const scaleFactor = 1 + (dx + dy) / 100;
-            if (newStroke.tool === 'text') {
-              newStroke.fontSize = Math.max(12, (newStroke.fontSize || 24) * scaleFactor);
+            if (previewStroke.tool === 'text') {
+              previewStroke.fontSize = Math.max(12, (previewStroke.fontSize || 24) * scaleFactor);
             } else {
-              newStroke.symbolSize = Math.max(20, (newStroke.symbolSize || 40) * scaleFactor);
+              previewStroke.symbolSize = Math.max(20, (previewStroke.symbolSize || 40) * scaleFactor);
             }
           }
         }
         
-        const newStrokes = [...strokes];
-        newStrokes[selectedStrokeIndex] = newStroke;
-        setStrokes(newStrokes);
-        setDragStartPoint(point);
-        
       } else if (isDraggingStroke) {
         // 移动整个stroke
-        const newStroke = { ...selectedStroke };
-        newStroke.points = selectedStroke.points.map(p => ({
+        previewStroke.points = selectedStroke.points.map(p => ({
           x: p.x + dx,
           y: p.y + dy
         }));
-        
-        const newStrokes = [...strokes];
-        newStrokes[selectedStrokeIndex] = newStroke;
-        setStrokes(newStrokes);
-        setDragStartPoint(point);
+      }
+      
+      // 实时绘制预览（不保存到strokes）
+      redrawAll();
+      const canvas = canvasRef.current;
+      if (canvas) {
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          // 绘制预览的stroke
+          if (previewStroke.tool === 'text') {
+            drawText(ctx, previewStroke);
+          } else if (previewStroke.tool === 'symbol') {
+            drawSymbol(ctx, previewStroke);
+          } else if (previewStroke.tool === 'shape' && previewStroke.shapeType && previewStroke.points.length >= 2) {
+            drawShape(ctx, previewStroke.shapeType, previewStroke.points[0], previewStroke.points[1], {
+              color: previewStroke.color,
+              width: previewStroke.width,
+              filled: previewStroke.filled || false
+            });
+          } else if (previewStroke.points.length >= 2) {
+            ctx.strokeStyle = previewStroke.color;
+            ctx.lineWidth = previewStroke.width;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.beginPath();
+            ctx.moveTo(previewStroke.points[0].x, previewStroke.points[0].y);
+            for (let i = 1; i < previewStroke.points.length; i++) {
+              ctx.lineTo(previewStroke.points[i].x, previewStroke.points[i].y);
+            }
+            ctx.stroke();
+          }
+          
+          // 重新绘制选中框在预览stroke上
+          drawSelectionBox(ctx, previewStroke);
+        }
       }
       
       return;
@@ -450,8 +471,58 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
   const handleMouseUp = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const point = getCanvasCoordinates(e);
     
-    // 选择工具：结束拖拽
-    if (currentTool === 'select') {
+    // 选择工具：结束拖拽并保存
+    if (currentTool === 'select' && selectedStrokeIndex !== null && dragStartPoint) {
+      const dx = point.x - dragStartPoint.x;
+      const dy = point.y - dragStartPoint.y;
+      
+      const selectedStroke = strokes[selectedStrokeIndex];
+      const newStroke = { ...selectedStroke };
+      
+      if (activeControlPoint && activeControlPoint !== 'rotate') {
+        // 缩放/拉伸完成，保存
+        if (newStroke.tool === 'shape' && newStroke.points.length >= 2) {
+          const [p1, p2] = newStroke.points;
+          let newP1 = { ...p1 };
+          let newP2 = { ...p2 };
+          
+          switch (activeControlPoint) {
+            case 'tl': newP1 = { x: p1.x + dx, y: p1.y + dy }; break;
+            case 'tr': newP2 = { x: p2.x + dx, y: p1.y + dy }; newP1.y = p1.y + dy; break;
+            case 'bl': newP1 = { x: p1.x + dx, y: p1.y }; newP2.y = p2.y + dy; break;
+            case 'br': newP2 = { x: p2.x + dx, y: p2.y + dy }; break;
+            case 'tm': newP1.y = p1.y + dy; break;
+            case 'bm': newP2.y = p2.y + dy; break;
+            case 'ml': newP1.x = p1.x + dx; break;
+            case 'mr': newP2.x = p2.x + dx; break;
+          }
+          
+          newStroke.points = [newP1, newP2];
+        } else if (newStroke.tool === 'text' || newStroke.tool === 'symbol') {
+          const scaleFactor = 1 + (dx + dy) / 100;
+          if (newStroke.tool === 'text') {
+            newStroke.fontSize = Math.max(12, (newStroke.fontSize || 24) * scaleFactor);
+          } else {
+            newStroke.symbolSize = Math.max(20, (newStroke.symbolSize || 40) * scaleFactor);
+          }
+        }
+        
+        const newStrokes = [...strokes];
+        newStrokes[selectedStrokeIndex] = newStroke;
+        setStrokes(newStrokes);
+        
+      } else if (isDraggingStroke) {
+        // 移动完成，保存
+        newStroke.points = selectedStroke.points.map(p => ({
+          x: p.x + dx,
+          y: p.y + dy
+        }));
+        
+        const newStrokes = [...strokes];
+        newStrokes[selectedStrokeIndex] = newStroke;
+        setStrokes(newStrokes);
+      }
+      
       setIsDraggingStroke(false);
       setActiveControlPoint(null);
       setDragStartPoint(null);
@@ -598,14 +669,6 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
     });
     
     // 绘制选中框
-    console.log('Check selection box:', {
-      selectedStrokeIndex,
-      strokesLength: strokes.length,
-      condition1: selectedStrokeIndex !== null,
-      condition2: selectedStrokeIndex < strokes.length,
-      selectedStroke: strokes[selectedStrokeIndex]
-    });
-    
     if (selectedStrokeIndex !== null && selectedStrokeIndex < strokes.length) {
       drawSelectionBox(ctx, strokes[selectedStrokeIndex]);
     }
@@ -1070,9 +1133,7 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
 
   // 绘制选中控制框
   const drawSelectionBox = (ctx: CanvasRenderingContext2D, stroke: Stroke) => {
-    console.log('drawSelectionBox called, stroke:', stroke);
     const bbox = getStrokeBoundingBox(stroke);
-    console.log('bbox:', bbox);
     if (!bbox) return;
     
     const padding = 10;
