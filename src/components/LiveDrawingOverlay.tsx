@@ -598,6 +598,14 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
     });
     
     // 绘制选中框
+    console.log('Check selection box:', {
+      selectedStrokeIndex,
+      strokesLength: strokes.length,
+      condition1: selectedStrokeIndex !== null,
+      condition2: selectedStrokeIndex < strokes.length,
+      selectedStroke: strokes[selectedStrokeIndex]
+    });
+    
     if (selectedStrokeIndex !== null && selectedStrokeIndex < strokes.length) {
       drawSelectionBox(ctx, strokes[selectedStrokeIndex]);
     }
