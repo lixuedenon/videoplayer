@@ -376,6 +376,13 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const point = getCanvasCoordinates(e);
     
+    console.log('handleMouseMove:', {
+      currentTool,
+      selectedStrokeIndex,
+      dragStartPoint,
+      activeControlPoint
+    });
+    
     // 选择工具：拖拽移动或变换
     if (currentTool === 'select' && selectedStrokeIndex !== null && dragStartPoint) {
       const dx = point.x - dragStartPoint.x;
