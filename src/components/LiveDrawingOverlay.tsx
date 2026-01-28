@@ -545,32 +545,29 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
           }
         } else if (activeControlPoint === 'br') {
           // 缩放完成，保存
-        if (newStroke.tool === 'shape' && newStroke.points.length >= 2) {
-          const [p1, p2] = newStroke.points;
-          let left = Math.min(p1.x, p2.x), right = Math.max(p1.x, p2.x);
-          let top = Math.min(p1.y, p2.y), bottom = Math.max(p1.y, p2.y);
-          
-          if (activeControlPoint === 'br') {
+          if (newStroke.tool === 'shape' && newStroke.points.length >= 2) {
+            const [p1, p2] = newStroke.points;
+            let left = Math.min(p1.x, p2.x), right = Math.max(p1.x, p2.x);
+            let top = Math.min(p1.y, p2.y), bottom = Math.max(p1.y, p2.y);
+            
             right += dx;
             bottom += dy;
+            
+            newStroke.points = [{ x: left, y: top }, { x: right, y: bottom }];
+          } else if (newStroke.tool === 'text' || newStroke.tool === 'symbol') {
+            // 文字/符号的缩放
+            const scaleFactor = 1 + (dx + dy) / 100;
+            if (newStroke.tool === 'text') {
+              newStroke.fontSize = Math.max(12, (newStroke.fontSize || 24) * scaleFactor);
+            } else {
+              newStroke.symbolSize = Math.max(20, (newStroke.symbolSize || 40) * scaleFactor);
+            }
           }
           
-          newStroke.points = [{ x: left, y: top }, { x: right, y: bottom }];
+          const newStrokes = [...strokes];
+          newStrokes[selectedStrokeIndex] = newStroke;
+          setStrokes(newStrokes);
         }
-        
-        // 如果是文字/符号的缩放
-        if (activeControlPoint === 'br' && (newStroke.tool === 'text' || newStroke.tool === 'symbol')) {
-          const scaleFactor = 1 + (dx + dy) / 100;
-          if (newStroke.tool === 'text') {
-            newStroke.fontSize = Math.max(12, (newStroke.fontSize || 24) * scaleFactor);
-          } else {
-            newStroke.symbolSize = Math.max(20, (newStroke.symbolSize || 40) * scaleFactor);
-          }
-        }
-        
-        const newStrokes = [...strokes];
-        newStrokes[selectedStrokeIndex] = newStroke;
-        setStrokes(newStrokes);
         
       } else if (isDraggingStroke) {
         // 移动完成，保存
