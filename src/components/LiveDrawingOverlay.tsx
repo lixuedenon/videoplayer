@@ -227,10 +227,8 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
       if (selectedStrokeIndex !== null) {
         const selectedStroke = strokes[selectedStrokeIndex];
         const controlPoint = getControlPointAtPosition(point, selectedStroke);
-        console.log('检测到控制点:', controlPoint);
         
         if (controlPoint) {
-          console.log('设置activeControlPoint:', controlPoint);
           setActiveControlPoint(controlPoint);
           setDragStartPoint(point);
           return;
@@ -376,7 +374,6 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const point = getCanvasCoordinates(e);
     
-    console.log('handleMouseMove:', {
       currentTool,
       selectedStrokeIndex,
       dragStartPoint: dragStartPoint ? `{x:${dragStartPoint.x}, y:${dragStartPoint.y}}` : null,
@@ -395,7 +392,6 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
         // 操作控制点：缩放/旋转
         if (activeControlPoint === 'rotate') {
           // 旋转逻辑
-          console.log('进入旋转逻辑');
           if (previewStroke.tool === 'shape' && previewStroke.points.length >= 2) {
             const [p1, p2] = previewStroke.points;
             const centerX = (p1.x + p2.x) / 2;
@@ -404,7 +400,6 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
             // 计算旋转角度
             const angle = Math.atan2(point.y - centerY, point.x - centerX);
             const degrees = (angle * 180 / Math.PI + 90 + 360) % 360;
-            console.log('旋转角度:', degrees);
             previewStroke.rotation = degrees;
           }
         } else {
@@ -574,12 +569,14 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
               newStroke.symbolSize = Math.max(20, (newStroke.symbolSize || 40) * scaleFactor);
             }
           }
-          
-          const newStrokes = [...strokes];
-          newStrokes[selectedStrokeIndex] = newStroke;
-          setStrokes(newStrokes);
         }
         
+        // 保存修改（对旋转和缩放都适用）
+        const newStrokes = [...strokes];
+        newStrokes[selectedStrokeIndex] = newStroke;
+        setStrokes(newStrokes);
+      }
+      
       } else if (isDraggingStroke) {
         // 移动完成，保存
         newStroke.points = selectedStroke.points.map(p => ({
@@ -760,9 +757,7 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
     const centerY = (start.y + end.y) / 2;
     
     // 如果有旋转，应用旋转变换
-    console.log('drawShape rotation检查:', options.rotation, typeof options.rotation);
     if (options.rotation !== undefined && options.rotation !== 0) {
-      console.log('应用旋转:', options.rotation, '度');
       ctx.translate(centerX, centerY);
       ctx.rotate(options.rotation * Math.PI / 180);
       ctx.translate(-centerX, -centerY);
@@ -1284,12 +1279,9 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
       { id: 'rotate', x: x + w / 2, y: y - 30 },
     ];
     
-    console.log('控制点位置:', points);
-    console.log('鼠标点击位置:', point);
     
     for (const cp of points) {
       const dist = Math.sqrt(Math.pow(point.x - cp.x, 2) + Math.pow(point.y - cp.y, 2));
-      console.log(`控制点${cp.id}距离:`, dist);
       if (dist < hitRadius) return cp.id;
     }
     
