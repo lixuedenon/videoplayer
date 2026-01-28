@@ -571,6 +571,59 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
       setIsDraggingStroke(false);
       setActiveControlPoint(null);
       setDragStartPoint(null);
+      
+      // 松开后手动重绘以保持选中框显示
+      setTimeout(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // 重绘所有strokes（使用最新的newStrokes）
+        const latestStrokes = isDraggingStroke || activeControlPoint ? 
+          (() => {
+            const updated = [...strokes];
+            updated[selectedStrokeIndex] = newStroke;
+            return updated;
+          })() : strokes;
+          
+        latestStrokes.forEach(stroke => {
+          if (stroke.tool === 'text') {
+            drawText(ctx, stroke);
+          } else if (stroke.tool === 'symbol') {
+            drawSymbol(ctx, stroke);
+          } else if (stroke.tool === 'shape' && stroke.shapeType && stroke.points.length >= 2) {
+            drawShape(ctx, stroke.shapeType, stroke.points[0], stroke.points[1], {
+              color: stroke.color,
+              width: stroke.width,
+              filled: stroke.filled || false
+            });
+          } else if (stroke.points.length >= 2) {
+            ctx.strokeStyle = stroke.color;
+            ctx.lineWidth = stroke.width;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            if (stroke.tool === 'eraser') {
+              ctx.globalCompositeOperation = 'destination-out';
+            }
+            ctx.beginPath();
+            ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+            for (let j = 1; j < stroke.points.length; j++) {
+              ctx.lineTo(stroke.points[j].x, stroke.points[j].y);
+            }
+            ctx.stroke();
+            ctx.globalCompositeOperation = 'source-over';
+          }
+        });
+        
+        // 重新绘制选中框
+        if (selectedStrokeIndex !== null && selectedStrokeIndex < latestStrokes.length) {
+          drawSelectionBox(ctx, latestStrokes[selectedStrokeIndex]);
+        }
+      }, 0);
+      
       return;
     }
     
