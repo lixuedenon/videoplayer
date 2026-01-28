@@ -392,14 +392,40 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
             let newP2 = { ...p2 };
             
             switch (activeControlPoint) {
-              case 'tl': newP1 = { x: p1.x + dx, y: p1.y + dy }; break;
-              case 'tr': newP2 = { x: p2.x + dx, y: p1.y + dy }; newP1.y = p1.y + dy; break;
-              case 'bl': newP1 = { x: p1.x + dx, y: p1.y }; newP2.y = p2.y + dy; break;
-              case 'br': newP2 = { x: p2.x + dx, y: p2.y + dy }; break;
-              case 'tm': newP1.y = p1.y + dy; break;
-              case 'bm': newP2.y = p2.y + dy; break;
-              case 'ml': newP1.x = p1.x + dx; break;
-              case 'mr': newP2.x = p2.x + dx; break;
+              case 'tl': 
+                // 左上：移动左上角
+                newP1 = { x: p1.x + dx, y: p1.y + dy };
+                break;
+              case 'tr': 
+                // 右上：改变右边界和上边界
+                newP2.x = p2.x + dx;
+                newP1.y = p1.y + dy;
+                break;
+              case 'bl': 
+                // 左下：改变左边界和下边界
+                newP1.x = p1.x + dx;
+                newP2.y = p2.y + dy;
+                break;
+              case 'br': 
+                // 右下：移动右下角
+                newP2 = { x: p2.x + dx, y: p2.y + dy };
+                break;
+              case 'tm': 
+                // 上中：只改变上边界
+                newP1.y = p1.y + dy;
+                break;
+              case 'bm': 
+                // 下中：只改变下边界
+                newP2.y = p2.y + dy;
+                break;
+              case 'ml': 
+                // 左中：只改变左边界
+                newP1.x = p1.x + dx;
+                break;
+              case 'mr': 
+                // 右中：只改变右边界
+                newP2.x = p2.x + dx;
+                break;
             }
             
             previewStroke.points = [newP1, newP2];
@@ -468,7 +494,7 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
       if (!ctx) return;
       
       // 重绘所有已有stroke
-      redrawCanvas();
+      redrawAll();
       
       // 绘制预览形状
       drawShape(ctx, selectedShape.type, shapeStartPoint, point, {
@@ -532,14 +558,32 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
           let newP2 = { ...p2 };
           
           switch (activeControlPoint) {
-            case 'tl': newP1 = { x: p1.x + dx, y: p1.y + dy }; break;
-            case 'tr': newP2 = { x: p2.x + dx, y: p1.y + dy }; newP1.y = p1.y + dy; break;
-            case 'bl': newP1 = { x: p1.x + dx, y: p1.y }; newP2.y = p2.y + dy; break;
-            case 'br': newP2 = { x: p2.x + dx, y: p2.y + dy }; break;
-            case 'tm': newP1.y = p1.y + dy; break;
-            case 'bm': newP2.y = p2.y + dy; break;
-            case 'ml': newP1.x = p1.x + dx; break;
-            case 'mr': newP2.x = p2.x + dx; break;
+            case 'tl': 
+              newP1 = { x: p1.x + dx, y: p1.y + dy };
+              break;
+            case 'tr': 
+              newP2.x = p2.x + dx;
+              newP1.y = p1.y + dy;
+              break;
+            case 'bl': 
+              newP1.x = p1.x + dx;
+              newP2.y = p2.y + dy;
+              break;
+            case 'br': 
+              newP2 = { x: p2.x + dx, y: p2.y + dy };
+              break;
+            case 'tm': 
+              newP1.y = p1.y + dy;
+              break;
+            case 'bm': 
+              newP2.y = p2.y + dy;
+              break;
+            case 'ml': 
+              newP1.x = p1.x + dx;
+              break;
+            case 'mr': 
+              newP2.x = p2.x + dx;
+              break;
           }
           
           newStroke.points = [newP1, newP2];
@@ -724,52 +768,6 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
     ctx.textBaseline = 'top';
     ctx.fillText(stroke.text, stroke.points[0].x, stroke.points[0].y);
     ctx.restore();
-  };
-
-  const redrawCanvas = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    strokes.forEach(stroke => {
-      if (stroke.tool === 'text') {
-        drawText(ctx, stroke);
-      } else if (stroke.tool === 'symbol') {
-        drawSymbol(ctx, stroke);
-      } else if (stroke.tool === 'shape' && stroke.shapeType) {
-        drawShape(ctx, stroke.shapeType, stroke.points[0], stroke.points[1], {
-          color: stroke.color,
-          width: stroke.width,
-          filled: stroke.filled || false
-        });
-      } else if (stroke.points.length >= 2) {
-        // 画笔/橡皮擦
-        ctx.strokeStyle = stroke.color;
-        ctx.lineWidth = stroke.width;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        if (stroke.tool === 'eraser') {
-          ctx.globalCompositeOperation = 'destination-out';
-        } else {
-          ctx.globalCompositeOperation = 'source-over';
-        }
-        ctx.beginPath();
-        ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
-        for (let i = 1; i < stroke.points.length; i++) {
-          ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
-        }
-        ctx.stroke();
-        ctx.globalCompositeOperation = 'source-over';
-      }
-    });
-    
-    // 绘制选中框
-    if (selectedStrokeIndex !== null && selectedStrokeIndex < strokes.length) {
-      drawSelectionBox(ctx, strokes[selectedStrokeIndex]);
-    }
   };
 
   const drawShape = (ctx: CanvasRenderingContext2D, shapeType: ShapeType, start: Point, end: Point, options: { color: string; width: number; filled: boolean }) => {
@@ -1234,7 +1232,7 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
     const bbox = getStrokeBoundingBox(stroke);
     if (!bbox) return;
     
-    const padding = 10;
+    const padding = 3;  // 减小到3px，更贴近形状
     const x = bbox.x - padding;
     const y = bbox.y - padding;
     const w = bbox.width + padding * 2;
@@ -1290,7 +1288,7 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
     const bbox = getStrokeBoundingBox(stroke);
     if (!bbox) return null;
     
-    const padding = 10;
+    const padding = 3;  // 与drawSelectionBox保持一致
     const x = bbox.x - padding;
     const y = bbox.y - padding;
     const w = bbox.width + padding * 2;
@@ -1435,7 +1433,9 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
       {/* 绘图画布 */}
       <canvas
         ref={canvasRef}
-        className="absolute top-0 left-0 w-full h-full cursor-crosshair"
+        className={`absolute top-0 left-0 w-full h-full ${
+          currentTool === 'select' ? 'cursor-default' : 'cursor-crosshair'
+        }`}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
