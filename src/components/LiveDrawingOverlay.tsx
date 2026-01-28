@@ -388,47 +388,55 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
           // 缩放/拉伸
           if (previewStroke.tool === 'shape' && previewStroke.points.length >= 2) {
             const [p1, p2] = previewStroke.points;
-            let newP1 = { ...p1 };
-            let newP2 = { ...p2 };
             
+            // 计算真实边界（不管p1/p2谁大谁小）
+            const left = Math.min(p1.x, p2.x);
+            const right = Math.max(p1.x, p2.x);
+            const top = Math.min(p1.y, p2.y);
+            const bottom = Math.max(p1.y, p2.y);
+            
+            let newLeft = left;
+            let newRight = right;
+            let newTop = top;
+            let newBottom = bottom;
+            
+            // 根据控制点调整边界
             switch (activeControlPoint) {
               case 'tl': 
-                // 左上：移动左上角
-                newP1 = { x: p1.x + dx, y: p1.y + dy };
+                newLeft = left + dx;
+                newTop = top + dy;
                 break;
               case 'tr': 
-                // 右上：改变右边界和上边界
-                newP2.x = p2.x + dx;
-                newP1.y = p1.y + dy;
+                newRight = right + dx;
+                newTop = top + dy;
                 break;
               case 'bl': 
-                // 左下：改变左边界和下边界
-                newP1.x = p1.x + dx;
-                newP2.y = p2.y + dy;
+                newLeft = left + dx;
+                newBottom = bottom + dy;
                 break;
               case 'br': 
-                // 右下：移动右下角
-                newP2 = { x: p2.x + dx, y: p2.y + dy };
+                newRight = right + dx;
+                newBottom = bottom + dy;
                 break;
               case 'tm': 
-                // 上中：只改变上边界
-                newP1.y = p1.y + dy;
+                newTop = top + dy;
                 break;
               case 'bm': 
-                // 下中：只改变下边界
-                newP2.y = p2.y + dy;
+                newBottom = bottom + dy;
                 break;
               case 'ml': 
-                // 左中：只改变左边界
-                newP1.x = p1.x + dx;
+                newLeft = left + dx;
                 break;
               case 'mr': 
-                // 右中：只改变右边界
-                newP2.x = p2.x + dx;
+                newRight = right + dx;
                 break;
             }
             
-            previewStroke.points = [newP1, newP2];
+            // 始终使用标准化坐标（左上→右下）
+            previewStroke.points = [
+              { x: newLeft, y: newTop },     // p1 = 左上
+              { x: newRight, y: newBottom }  // p2 = 右下
+            ];
           } else if (previewStroke.tool === 'text' || previewStroke.tool === 'symbol') {
             // 文字/符号缩放：改变大小
             const scaleFactor = 1 + (dx + dy) / 100;
@@ -554,39 +562,55 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
         // 缩放/拉伸完成，保存
         if (newStroke.tool === 'shape' && newStroke.points.length >= 2) {
           const [p1, p2] = newStroke.points;
-          let newP1 = { ...p1 };
-          let newP2 = { ...p2 };
           
+          // 计算真实边界
+          const left = Math.min(p1.x, p2.x);
+          const right = Math.max(p1.x, p2.x);
+          const top = Math.min(p1.y, p2.y);
+          const bottom = Math.max(p1.y, p2.y);
+          
+          let newLeft = left;
+          let newRight = right;
+          let newTop = top;
+          let newBottom = bottom;
+          
+          // 根据控制点调整边界
           switch (activeControlPoint) {
             case 'tl': 
-              newP1 = { x: p1.x + dx, y: p1.y + dy };
+              newLeft = left + dx;
+              newTop = top + dy;
               break;
             case 'tr': 
-              newP2.x = p2.x + dx;
-              newP1.y = p1.y + dy;
+              newRight = right + dx;
+              newTop = top + dy;
               break;
             case 'bl': 
-              newP1.x = p1.x + dx;
-              newP2.y = p2.y + dy;
+              newLeft = left + dx;
+              newBottom = bottom + dy;
               break;
             case 'br': 
-              newP2 = { x: p2.x + dx, y: p2.y + dy };
+              newRight = right + dx;
+              newBottom = bottom + dy;
               break;
             case 'tm': 
-              newP1.y = p1.y + dy;
+              newTop = top + dy;
               break;
             case 'bm': 
-              newP2.y = p2.y + dy;
+              newBottom = bottom + dy;
               break;
             case 'ml': 
-              newP1.x = p1.x + dx;
+              newLeft = left + dx;
               break;
             case 'mr': 
-              newP2.x = p2.x + dx;
+              newRight = right + dx;
               break;
           }
           
-          newStroke.points = [newP1, newP2];
+          // 始终使用标准化坐标（左上→右下）
+          newStroke.points = [
+            { x: newLeft, y: newTop },     // p1 = 左上
+            { x: newRight, y: newBottom }  // p2 = 右下
+          ];
         } else if (newStroke.tool === 'text' || newStroke.tool === 'symbol') {
           const scaleFactor = 1 + (dx + dy) / 100;
           if (newStroke.tool === 'text') {
