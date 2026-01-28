@@ -54,6 +54,7 @@ interface Stroke {
   // 形状相关（当tool='shape'时使用）
   shapeType?: ShapeType;
   filled?: boolean;
+  rotation?: number;  // 旋转角度（度数，0-360）
 }
 
 export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
@@ -172,7 +173,8 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
         drawShape(ctx, stroke.shapeType, stroke.points[0], stroke.points[1], {
           color: stroke.color,
           width: stroke.width,
-          filled: stroke.filled || false
+          filled: stroke.filled || false,
+          rotation: stroke.rotation
         });
         return;
       }
@@ -258,7 +260,8 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
                     drawShape(ctx, stroke.shapeType, stroke.points[0], stroke.points[1], {
                       color: stroke.color,
                       width: stroke.width,
-                      filled: stroke.filled || false
+                      filled: stroke.filled || false,
+                      rotation: stroke.rotation
                     });
                   } else if (stroke.points.length >= 2) {
                     ctx.strokeStyle = stroke.color;
@@ -382,8 +385,17 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
       if (activeControlPoint) {
         // 操作控制点：缩放/旋转
         if (activeControlPoint === 'rotate') {
-          // 旋转逻辑（暂时简化）
-          // TODO: 实现旋转
+          // 旋转逻辑
+          if (previewStroke.tool === 'shape' && previewStroke.points.length >= 2) {
+            const [p1, p2] = previewStroke.points;
+            const centerX = (p1.x + p2.x) / 2;
+            const centerY = (p1.y + p2.y) / 2;
+            
+            // 计算旋转角度
+            const angle = Math.atan2(point.y - centerY, point.x - centerX);
+            const degrees = (angle * 180 / Math.PI + 90 + 360) % 360;
+            previewStroke.rotation = degrees;
+          }
         } else {
           // 缩放/拉伸
           if (previewStroke.tool === 'shape' && previewStroke.points.length >= 2) {
@@ -391,15 +403,10 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
             let left = Math.min(p1.x, p2.x), right = Math.max(p1.x, p2.x);
             let top = Math.min(p1.y, p2.y), bottom = Math.max(p1.y, p2.y);
             
-            switch (activeControlPoint) {
-              case 'tl': left += dx; top += dy; break;
-              case 'tr': right += dx; top += dy; break;
-              case 'bl': left += dx; bottom += dy; break;
-              case 'br': right += dx; bottom += dy; break;
-              case 'tm': top += dy; break;
-              case 'bm': bottom += dy; break;
-              case 'ml': left += dx; break;
-              case 'mr': right += dx; break;
+            // 只保留右下角缩放
+            if (activeControlPoint === 'br') {
+              right += dx;
+              bottom += dy;
             }
             
             previewStroke.points = [{ x: left, y: top }, { x: right, y: bottom }];
@@ -437,7 +444,8 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
             drawShape(ctx, previewStroke.shapeType, previewStroke.points[0], previewStroke.points[1], {
               color: previewStroke.color,
               width: previewStroke.width,
-              filled: previewStroke.filled || false
+              filled: previewStroke.filled || false,
+              rotation: previewStroke.rotation
             });
           } else if (previewStroke.points.length >= 2) {
             ctx.strokeStyle = previewStroke.color;
@@ -524,26 +532,34 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
       const selectedStroke = strokes[selectedStrokeIndex];
       const newStroke = { ...selectedStroke };
       
-      if (activeControlPoint && activeControlPoint !== 'rotate') {
-        // 缩放/拉伸完成，保存
+      if (activeControlPoint) {
+        if (activeControlPoint === 'rotate') {
+          // 旋转完成，保存
+          if (newStroke.tool === 'shape' && newStroke.points.length >= 2) {
+            const [p1, p2] = newStroke.points;
+            const centerX = (p1.x + p2.x) / 2;
+            const centerY = (p1.y + p2.y) / 2;
+            const angle = Math.atan2(point.y - centerY, point.x - centerX);
+            const degrees = (angle * 180 / Math.PI + 90 + 360) % 360;
+            newStroke.rotation = degrees;
+          }
+        } else if (activeControlPoint === 'br') {
+          // 缩放完成，保存
         if (newStroke.tool === 'shape' && newStroke.points.length >= 2) {
           const [p1, p2] = newStroke.points;
           let left = Math.min(p1.x, p2.x), right = Math.max(p1.x, p2.x);
           let top = Math.min(p1.y, p2.y), bottom = Math.max(p1.y, p2.y);
           
-          switch (activeControlPoint) {
-            case 'tl': left += dx; top += dy; break;
-            case 'tr': right += dx; top += dy; break;
-            case 'bl': left += dx; bottom += dy; break;
-            case 'br': right += dx; bottom += dy; break;
-            case 'tm': top += dy; break;
-            case 'bm': bottom += dy; break;
-            case 'ml': left += dx; break;
-            case 'mr': right += dx; break;
+          if (activeControlPoint === 'br') {
+            right += dx;
+            bottom += dy;
           }
           
           newStroke.points = [{ x: left, y: top }, { x: right, y: bottom }];
-        } else if (newStroke.tool === 'text' || newStroke.tool === 'symbol') {
+        }
+        
+        // 如果是文字/符号的缩放
+        if (activeControlPoint === 'br' && (newStroke.tool === 'text' || newStroke.tool === 'symbol')) {
           const scaleFactor = 1 + (dx + dy) / 100;
           if (newStroke.tool === 'text') {
             newStroke.fontSize = Math.max(12, (newStroke.fontSize || 24) * scaleFactor);
@@ -598,7 +614,8 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
             drawShape(ctx, stroke.shapeType, stroke.points[0], stroke.points[1], {
               color: stroke.color,
               width: stroke.width,
-              filled: stroke.filled || false
+              filled: stroke.filled || false,
+              rotation: stroke.rotation
             });
           } else if (stroke.points.length >= 2) {
             ctx.strokeStyle = stroke.color;
@@ -726,8 +743,18 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
     ctx.restore();
   };
 
-  const drawShape = (ctx: CanvasRenderingContext2D, shapeType: ShapeType, start: Point, end: Point, options: { color: string; width: number; filled: boolean }) => {
+  const drawShape = (ctx: CanvasRenderingContext2D, shapeType: ShapeType, start: Point, end: Point, options: { color: string; width: number; filled: boolean; rotation?: number }) => {
     ctx.save();
+    
+    // 如果有旋转，应用旋转变换
+    if (options.rotation) {
+      const centerX = (start.x + end.x) / 2;
+      const centerY = (start.y + end.y) / 2;
+      ctx.translate(centerX, centerY);
+      ctx.rotate(options.rotation * Math.PI / 180);
+      ctx.translate(-centerX, -centerY);
+    }
+    
     ctx.strokeStyle = options.color;
     ctx.fillStyle = options.color;
     ctx.lineWidth = options.width;
@@ -1205,14 +1232,7 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
     // 绘制8个控制点
     const controlSize = 8;
     const points = [
-      { id: 'tl', x: x, y: y },                           // 左上
-      { id: 'tm', x: x + w / 2, y: y },                   // 上中
-      { id: 'tr', x: x + w, y: y },                       // 右上
-      { id: 'ml', x: x, y: y + h / 2 },                   // 左中
-      { id: 'mr', x: x + w, y: y + h / 2 },               // 右中
-      { id: 'bl', x: x, y: y + h },                       // 左下
-      { id: 'bm', x: x + w / 2, y: y + h },               // 下中
-      { id: 'br', x: x + w, y: y + h },                   // 右下
+      { id: 'br', x: x + w, y: y + h },  // 只保留右下角
     ];
     
     ctx.fillStyle = '#FFFFFF';
@@ -1252,13 +1272,6 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
     const hitRadius = 10;
     
     const points = [
-      { id: 'tl', x: x, y: y },
-      { id: 'tm', x: x + w / 2, y: y },
-      { id: 'tr', x: x + w, y: y },
-      { id: 'ml', x: x, y: y + h / 2 },
-      { id: 'mr', x: x + w, y: y + h / 2 },
-      { id: 'bl', x: x, y: y + h },
-      { id: 'bm', x: x + w / 2, y: y + h },
       { id: 'br', x: x + w, y: y + h },
       { id: 'rotate', x: x + w / 2, y: y - 30 },
     ];
