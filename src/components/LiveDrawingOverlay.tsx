@@ -64,6 +64,7 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
   onSave
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const selectedSymbolRef = useRef<SymbolItem | null>(null);  // 存储最新选择的符号
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentTool, setCurrentTool] = useState<DrawingTool>('pen');
   const [penColor, setPenColor] = useState('#FF0000');
@@ -335,12 +336,14 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
     
     // 符号工具：点击放置符号
     if (currentTool === 'symbol') {
-      if (!selectedSymbol || !videoElement) return;
+      // 使用ref获取最新选择的符号（避免state延迟）
+      const currentSymbol = selectedSymbolRef.current;
+      if (!currentSymbol || !videoElement) return;
       
       console.log('创建符号stroke，当前selectedSymbol:', {
-        id: selectedSymbol.id,
-        char: selectedSymbol.char,
-        name: selectedSymbol.name
+        id: currentSymbol.id,
+        char: currentSymbol.char,
+        name: currentSymbol.name
       });
       
       const symbolStroke: Stroke = {
@@ -350,8 +353,8 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
         points: [point],
         startTime: videoElement.currentTime - startTimestamp,
         endTime: videoElement.currentTime - startTimestamp,
-        symbolId: selectedSymbol.id,
-        symbolChar: selectedSymbol.char,
+        symbolId: currentSymbol.id,
+        symbolChar: currentSymbol.char,
         symbolSize: [20, 30, 40, 50, 60][symbolSize - 1], // 5档大小
         symbolRotation: symbolRotation // 旋转角度
       };
@@ -751,8 +754,12 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
       char: symbol.char,
       name: symbol.name
     });
+    
+    // 同时更新state和ref，确保立即可用
+    selectedSymbolRef.current = symbol;
     setCurrentTool('symbol');
     setSelectedSymbol(symbol);
+    
     // 不关闭面板，允许连续选择
   };
 
