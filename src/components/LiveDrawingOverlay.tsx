@@ -1239,24 +1239,46 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
     const bbox = getStrokeBoundingBox(stroke);
     if (!bbox) return;
     
-    const padding = 3;  // 减小到3px，更贴近形状
+    const padding = 3;
     const x = bbox.x - padding;
     const y = bbox.y - padding;
     const w = bbox.width + padding * 2;
     const h = bbox.height + padding * 2;
     
-    // 绘制虚线边框
     ctx.save();
+    
+    // 如果有旋转，应用旋转变换
+    const rotation = stroke.rotation || 0;
+    if (rotation) {
+      // 计算旋转中心
+      let centerX, centerY;
+      if (stroke.tool === 'symbol' || stroke.tool === 'text') {
+        centerX = stroke.points[0].x;
+        centerY = stroke.points[0].y;
+      } else if (stroke.tool === 'shape' && stroke.points.length >= 2) {
+        centerX = (stroke.points[0].x + stroke.points[1].x) / 2;
+        centerY = (stroke.points[0].y + stroke.points[1].y) / 2;
+      } else {
+        centerX = x + w / 2;
+        centerY = y + h / 2;
+      }
+      
+      ctx.translate(centerX, centerY);
+      ctx.rotate(rotation * Math.PI / 180);
+      ctx.translate(-centerX, -centerY);
+    }
+    
+    // 绘制虚线边框
     ctx.strokeStyle = '#3B82F6';
     ctx.lineWidth = 2;
     ctx.setLineDash([5, 5]);
     ctx.strokeRect(x, y, w, h);
     ctx.setLineDash([]);
     
-    // 绘制8个控制点
+    // 绘制控制点
     const controlSize = 8;
     const points = [
-      { id: 'br', x: x + w, y: y + h },  // 只保留右下角
+      { id: 'br', x: x + w, y: y + h },  // 右下角
     ];
     
     ctx.fillStyle = '#FFFFFF';
@@ -1295,14 +1317,37 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
     const h = bbox.height + padding * 2;
     const hitRadius = 10;
     
+    // 计算旋转中心
+    let centerX, centerY;
+    if (stroke.tool === 'symbol' || stroke.tool === 'text') {
+      centerX = stroke.points[0].x;
+      centerY = stroke.points[0].y;
+    } else if (stroke.tool === 'shape' && stroke.points.length >= 2) {
+      centerX = (stroke.points[0].x + stroke.points[1].x) / 2;
+      centerY = (stroke.points[0].y + stroke.points[1].y) / 2;
+    } else {
+      centerX = x + w / 2;
+      centerY = y + h / 2;
+    }
+    
+    // 如果有旋转，需要将点击位置反向旋转到未旋转状态再检测
+    let testPoint = { ...point };
+    const rotation = stroke.rotation || 0;
+    if (rotation) {
+      const angle = -rotation * Math.PI / 180;  // 反向旋转
+      const dx = point.x - centerX;
+      const dy = point.y - centerY;
+      testPoint.x = centerX + dx * Math.cos(angle) - dy * Math.sin(angle);
+      testPoint.y = centerY + dx * Math.sin(angle) + dy * Math.cos(angle);
+    }
+    
     const points = [
       { id: 'br', x: x + w, y: y + h },
       { id: 'rotate', x: x + w / 2, y: y - 30 },
     ];
     
-    
     for (const cp of points) {
-      const dist = Math.sqrt(Math.pow(point.x - cp.x, 2) + Math.pow(point.y - cp.y, 2));
+      const dist = Math.sqrt(Math.pow(testPoint.x - cp.x, 2) + Math.pow(testPoint.y - cp.y, 2));
       if (dist < hitRadius) return cp.id;
     }
     
