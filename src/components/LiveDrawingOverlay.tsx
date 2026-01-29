@@ -569,8 +569,6 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
         const newStrokes = [...strokes];
         newStrokes[selectedStrokeIndex] = newStroke;
         setStrokes(newStrokes);
-      }
-      
       } else if (isDraggingStroke) {
         // 移动完成，保存
         newStroke.points = selectedStroke.points.map(p => ({
