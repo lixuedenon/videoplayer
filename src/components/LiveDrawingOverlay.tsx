@@ -386,10 +386,27 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
         // 操作控制点：缩放/旋转
         if (activeControlPoint === 'rotate') {
           // 旋转逻辑
-          if (previewStroke.tool === 'shape' && previewStroke.points.length >= 2) {
-            const [p1, p2] = previewStroke.points;
-            const centerX = (p1.x + p2.x) / 2;
-            const centerY = (p1.y + p2.y) / 2;
+          console.log('旋转检查:', {
+            tool: previewStroke.tool,
+            shapeType: previewStroke.shapeType,
+            symbolId: previewStroke.symbolId,
+            pointsLength: previewStroke.points.length
+          });
+          
+          // 支持形状和符号的旋转
+          if ((previewStroke.tool === 'shape' || previewStroke.tool === 'symbol') && previewStroke.points.length >= 1) {
+            // 计算中心点
+            let centerX, centerY;
+            if (previewStroke.tool === 'symbol') {
+              // 符号：使用第一个点作为中心
+              centerX = previewStroke.points[0].x;
+              centerY = previewStroke.points[0].y;
+            } else {
+              // 形状：使用两点的中心
+              const [p1, p2] = previewStroke.points;
+              centerX = (p1.x + p2.x) / 2;
+              centerY = (p1.y + p2.y) / 2;
+            }
             
             // 计算旋转角度
             const angle = Math.atan2(point.y - centerY, point.x - centerX);
@@ -535,10 +552,18 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
       if (activeControlPoint) {
         if (activeControlPoint === 'rotate') {
           // 旋转完成，保存
-          if (newStroke.tool === 'shape' && newStroke.points.length >= 2) {
-            const [p1, p2] = newStroke.points;
-            const centerX = (p1.x + p2.x) / 2;
-            const centerY = (p1.y + p2.y) / 2;
+          if ((newStroke.tool === 'shape' || newStroke.tool === 'symbol') && newStroke.points.length >= 1) {
+            // 计算中心点
+            let centerX, centerY;
+            if (newStroke.tool === 'symbol') {
+              centerX = newStroke.points[0].x;
+              centerY = newStroke.points[0].y;
+            } else {
+              const [p1, p2] = newStroke.points;
+              centerX = (p1.x + p2.x) / 2;
+              centerY = (p1.y + p2.y) / 2;
+            }
+            
             const angle = Math.atan2(point.y - centerY, point.x - centerX);
             const degrees = (angle * 180 / Math.PI + 90 + 360) % 360;
             newStroke.rotation = degrees;
@@ -717,9 +742,13 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
     
     ctx.save();
     ctx.translate(stroke.points[0].x, stroke.points[0].y);
-    if (stroke.symbolRotation) {
-      ctx.rotate((stroke.symbolRotation * Math.PI) / 180);
+    
+    // 支持两种旋转字段：rotation（新）和symbolRotation（旧）
+    const rotation = stroke.rotation !== undefined ? stroke.rotation : stroke.symbolRotation;
+    if (rotation) {
+      ctx.rotate((rotation * Math.PI) / 180);
     }
+    
     ctx.font = `${stroke.symbolSize || 40}px Arial`;
     ctx.fillStyle = stroke.color;
     ctx.textAlign = 'center';
