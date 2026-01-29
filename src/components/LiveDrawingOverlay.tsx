@@ -541,6 +541,13 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
   const handleMouseUp = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const point = getCanvasCoordinates(e);
     
+    console.log('handleMouseUp:', {
+      currentTool,
+      selectedStrokeIndex,
+      dragStartPoint: dragStartPoint ? 'exists' : 'null',
+      activeControlPoint
+    });
+    
     // 选择工具：结束拖拽并保存
     if (currentTool === 'select' && selectedStrokeIndex !== null && dragStartPoint) {
       const dx = point.x - dragStartPoint.x;
@@ -591,6 +598,12 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
         }
         
         // 保存修改（对旋转和缩放都适用）
+        console.log('保存stroke:', {
+          tool: newStroke.tool,
+          symbolChar: newStroke.symbolChar,
+          symbolId: newStroke.symbolId,
+          rotation: newStroke.rotation
+        });
         const newStrokes = [...strokes];
         newStrokes[selectedStrokeIndex] = newStroke;
         setStrokes(newStrokes);
@@ -1446,6 +1459,13 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
 
     const duration = videoElement.currentTime - startTimestamp;
     const thumbnail = generateThumbnail();
+
+    console.log('保存所有strokes:', strokes.map(s => ({
+      tool: s.tool,
+      symbolChar: s.symbolChar,
+      symbolId: s.symbolId,
+      shapeType: s.shapeType
+    })));
 
     onSave?.({
       strokes,
