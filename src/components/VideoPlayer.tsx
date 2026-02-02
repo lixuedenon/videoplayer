@@ -1,3 +1,6 @@
+// src/components/VideoPlayer.tsx
+// 视频播放器主组件
+
 import React, { useRef, useEffect, useState } from 'react';
 import {
   Play,
@@ -9,7 +12,6 @@ import {
   Maximize,
   Paintbrush,
   BookmarkIcon,
-  Settings,
   Circle,
   Square,
   Mic,
@@ -23,7 +25,7 @@ import { LiveDrawingOverlay } from './LiveDrawingOverlay';
 import { LiveDrawingReplay } from './LiveDrawingReplay';
 import { AnnotationsList } from './AnnotationsList';
 import { Annotation, DrawingData } from '../types/annotation';
-import { saveAnnotation, getAnnotations, deleteAnnotation, getVideoSegmentSettings, saveVideoSegmentSettings } from '../utils/database';
+import { saveAnnotation, getAnnotations, deleteAnnotation } from '../utils/database';
 import { VideoSegmentSettings } from '../types/videoSegment';
 import { VideoFile } from '../types/video';
 import { extractTextFromDrawingData } from '../utils/videoSegmentDownload';
@@ -59,6 +61,13 @@ interface VideoPlayerProps {
   isSeekFromAnnotation?: boolean;
   isSearchPanelOpen?: boolean;
   onCloseSearchPanel?: () => void;
+  // 录制设置props
+  recordingMode: RecordingMode;
+  includeMicrophone: boolean;
+  // 回放设置props
+  replayBufferBefore: number;
+  replayBufferAfter: number;
+  videoSegmentSettings: VideoSegmentSettings;
 }
 
 const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
@@ -89,7 +98,12 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
   onSetActivePanel,
   isSeekFromAnnotation = false,
   isSearchPanelOpen = false,
-  onCloseSearchPanel
+  onCloseSearchPanel,
+  recordingMode,
+  includeMicrophone,
+  replayBufferBefore,
+  replayBufferAfter,
+  videoSegmentSettings
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -113,32 +127,9 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
   const playbackStartTimeRef = useRef<number | null>(null);
   const [showAnnotationsList, setShowAnnotationsList] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
-  const [recordingMode, setRecordingMode] = useState<RecordingMode>('player');
-  const [includeMicrophone, setIncludeMicrophone] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const recorderRef = useRef<ScreenRecorder>(new ScreenRecorder());
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const [replayBufferBefore, setReplayBufferBefore] = useState<number>(() => {
-    const saved = localStorage.getItem('replayBufferBefore');
-    return saved ? parseFloat(saved) : 10;
-  });
-  const [replayBufferAfter, setReplayBufferAfter] = useState<number>(() => {
-    const saved = localStorage.getItem('replayBufferAfter');
-    return saved ? parseFloat(saved) : 5;
-  });
-  const [videoSegmentSettings, setVideoSegmentSettings] = useState<VideoSegmentSettings>({
-    beforeBuffer: 15,
-    afterBuffer: 20,
-    syncWithReplay: false
-  });
-  const [showSettings, setShowSettings] = useState(false);
-  const [tempReplayBufferBefore, setTempReplayBufferBefore] = useState<number>(10);
-  const [tempReplayBufferAfter, setTempReplayBufferAfter] = useState<number>(5);
-  const [tempVideoSegmentSettings, setTempVideoSegmentSettings] = useState<VideoSegmentSettings>({
-    beforeBuffer: 15,
-    afterBuffer: 20,
-    syncWithReplay: false
-  });
   const seekTargetEndTime = useRef<number | null>(null);
 
   useEffect(() => {
@@ -147,19 +138,10 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
     }
   }, [videoId]);
 
-  useEffect(() => {
-    loadVideoSegmentSettings();
-  }, []);
-
   const loadAnnotations = async () => {
     if (!videoId) return;
     const data = await getAnnotations(videoId);
     setAnnotations(data);
-  };
-
-  const loadVideoSegmentSettings = async () => {
-    const settings = await getVideoSegmentSettings();
-    setVideoSegmentSettings(settings);
   };
 
   useEffect(() => {
@@ -185,14 +167,12 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
       const handleCanPlay = () => {
         if (initialProgress > 0 && isSeekFromAnnotation) {
           video.currentTime = initialProgress;
-          // 设置播放停止时间,应用replayBufferAfter
-          const bufferAfter = parseFloat(localStorage.getItem('replayBufferAfter') || '5');
-          const bufferBefore = parseFloat(localStorage.getItem('replayBufferBefore') || '10');
+          const bufferAfter = replayBufferAfter;
+          const bufferBefore = replayBufferBefore;
           const originalTimestamp = initialProgress + bufferBefore;
           const endTime = Math.min(duration, originalTimestamp + bufferAfter);
           seekTargetEndTime.current = endTime;
         } else if (initialProgress > 0) {
-          // 正常播放,只设置进度,不设置自动暂停
           video.currentTime = initialProgress;
         }
       };
@@ -222,7 +202,6 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
     const attemptAutoPlay = () => {
       console.log('Attempting autoplay, readyState:', video.readyState);
       
-      // 等待playing事件,确保视频真正开始播放
       const handlePlaying = () => {
         console.log('Video actually started playing');
         onAutoPlayComplete?.();
@@ -287,12 +266,10 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
       setCurrentTime(current);
       onTimeUpdate(current, total);
 
-      // 检查是否需要关闭实时涂鸦回放
       if (showLivePlayback && currentPlaybackData) {
         const playbackEndTime = currentPlaybackData.startTimestamp + currentPlaybackData.liveDrawingData.duration;
         const allowedStartTime = Math.max(0, currentPlaybackData.startTimestamp - replayBufferBefore);
         
-        // 只有在明显超出范围时才关闭（允许1秒误差）
         if (current < allowedStartTime - 1 || current > playbackEndTime + 2) {
           setShowLivePlayback(false);
           setCurrentPlaybackData(null);
@@ -302,12 +279,10 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
       if (seekTargetEndTime.current !== null && current >= seekTargetEndTime.current) {
         videoRef.current.pause();
         seekTargetEndTime.current = null;
-        // 关闭实时涂鸦回放
         if (showLivePlayback) {
           setShowLivePlayback(false);
           setCurrentPlaybackData(null);
         }
-        // 清除isSeekFromAnnotation标志,避免影响后续视频
         if (isSeekFromAnnotation && onAutoPlayComplete) {
           onAutoPlayComplete();
         }
@@ -322,14 +297,12 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
       onLoadedMetadata(total);
       if (initialProgress > 0 && isSeekFromAnnotation) {
         videoRef.current.currentTime = initialProgress;
-        // 设置播放停止时间,应用replayBufferAfter
-        const bufferAfter = parseFloat(localStorage.getItem('replayBufferAfter') || '5');
-        const bufferBefore = parseFloat(localStorage.getItem('replayBufferBefore') || '10');
+        const bufferAfter = replayBufferAfter;
+        const bufferBefore = replayBufferBefore;
         const originalTimestamp = initialProgress + bufferBefore;
         const endTime = Math.min(total, originalTimestamp + bufferAfter);
         seekTargetEndTime.current = endTime;
       } else if (initialProgress > 0) {
-        // 正常播放,只设置进度,不设置自动暂停
         videoRef.current.currentTime = initialProgress;
       }
     }
@@ -453,7 +426,6 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
     }
   };
 
-  // 保存动态涂鸦
   const handleSaveLiveDrawing = async (data: {
     strokes: any[];
     startTimestamp: number;
@@ -466,12 +438,10 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
       return;
     }
 
-    // 从LiveDrawingOverlay的canvas获取尺寸
     const liveCanvas = document.querySelector('canvas');
     const canvasWidth = liveCanvas?.width || videoRef.current.videoWidth || 1280;
     const canvasHeight = liveCanvas?.height || videoRef.current.videoHeight || 720;
 
-    // 转换为LiveDrawingData格式
     const liveDrawingData = {
       strokes: data.strokes.map(stroke => ({
         tool: stroke.tool,
@@ -480,15 +450,12 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
         points: stroke.points,
         startTime: stroke.startTime,
         endTime: stroke.endTime,
-        // 符号字段（如果存在）
         symbolId: stroke.symbolId,
         symbolChar: stroke.symbolChar,
         symbolSize: stroke.symbolSize,
         symbolRotation: stroke.symbolRotation,
-        // 文字字段（如果存在）
         text: stroke.text,
         fontSize: stroke.fontSize,
-        // 形状字段（如果存在）
         shapeType: stroke.shapeType,
         filled: stroke.filled
       })),
@@ -497,7 +464,6 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
       canvasHeight
     };
 
-    // 创建一个空的DrawingData（兼容现有数据结构）
     const drawingData: DrawingData = {
       elements: [],
       canvasWidth,
@@ -508,7 +474,6 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
     let filePath: string | null = null;
     let finalThumbnail = data.thumbnail;
 
-    // 保存缩略图到文件系统
     if (await checkFileSystemSupport()) {
       try {
         const img = new Image();
@@ -546,9 +511,9 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
         data.startTimestamp,
         drawingData,
         finalThumbnail,
-        data.name,  // 使用用户输入的名称
+        data.name,
         '',
-        liveDrawingData  // 传递动态涂鸦数据
+        liveDrawingData
       );
 
       const updatedAnnotations = await getAnnotations();
@@ -586,11 +551,9 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
 
     const video = videoRef.current;
     
-    // 如果是实时涂鸦，直接跳到涂鸦开始时间
-    // 如果是静态涂鸦，使用缓冲时间
     const startTime = (is_live && live_drawing_data) 
-      ? timestamp  // 实时涂鸦：直接跳到开始时间
-      : Math.max(0, timestamp - replayBufferBefore);  // 静态涂鸦：使用缓冲
+      ? timestamp
+      : Math.max(0, timestamp - replayBufferBefore);
     
     const endTime = Math.min(duration, timestamp + (live_drawing_data?.duration || replayBufferAfter));
 
@@ -598,7 +561,6 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
     setCurrentTime(startTime);
     seekTargetEndTime.current = endTime;
 
-    // 如果是实时涂鸦，启动回放
     if (is_live && live_drawing_data) {
       playbackStartTimeRef.current = Date.now();
       setCurrentPlaybackData({
@@ -607,7 +569,6 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
       });
       setShowLivePlayback(true);
     } else {
-      // 关闭回放（如果之前打开了）
       setShowLivePlayback(false);
       setCurrentPlaybackData(null);
     }
@@ -629,36 +590,10 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
     }
   };
 
-  const openSettings = () => {
-    setTempReplayBufferBefore(replayBufferBefore);
-    setTempReplayBufferAfter(replayBufferAfter);
-    setTempVideoSegmentSettings({ ...videoSegmentSettings });
-    setShowSettings(true);
-  };
-
-  const handleSaveSettings = () => {
-    setReplayBufferBefore(tempReplayBufferBefore);
-    setReplayBufferAfter(tempReplayBufferAfter);
-    localStorage.setItem('replayBufferBefore', tempReplayBufferBefore.toString());
-    localStorage.setItem('replayBufferAfter', tempReplayBufferAfter.toString());
-
-    setVideoSegmentSettings(tempVideoSegmentSettings);
-    saveVideoSegmentSettings(tempVideoSegmentSettings);
-
-    setShowSettings(false);
-  };
-
-  const handleCancelSettings = () => {
-    setShowSettings(false);
-  };
-
-  // 录制相关函数
   const startRecording = async () => {
     try {
-      // 查找canvas（涂鸦层），可能不存在
       const canvas = document.querySelector('canvas') as HTMLCanvasElement | null;
       
-      // 如果是播放器模式且没有canvas，提示用户
       if (recordingMode === 'player' && !canvas) {
         const continueWithoutCanvas = confirm(
           '当前没有涂鸦标注。是否继续录制（仅录制视频画面）？\n\n' +
@@ -669,7 +604,6 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
         }
       }
 
-      // 如果不需要麦克风，直接开始录制
       if (!includeMicrophone) {
         await recorderRef.current.startRecording({
           mode: recordingMode,
@@ -687,7 +621,6 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
         return;
       }
 
-      // 需要麦克风时，先检查权限
       try {
         await recorderRef.current.startRecording({
           mode: recordingMode,
@@ -703,7 +636,6 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
           setRecordingTime(prev => prev + 1);
         }, 1000);
       } catch (micError: any) {
-        // 如果用户拒绝麦克风权限，提示是否继续不录制麦克风
         if (micError.name === 'NotAllowedError' || micError.name === 'PermissionDeniedError') {
           const continueWithoutMic = confirm('麦克风权限被拒绝。是否继续录制（不包含麦克风音频）？');
           if (continueWithoutMic) {
@@ -735,7 +667,6 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
     try {
       const blob = await recorderRef.current.stopRecording();
       
-      // 停止计时
       if (recordingTimerRef.current) {
         clearInterval(recordingTimerRef.current);
         recordingTimerRef.current = null;
@@ -744,11 +675,9 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
       setIsRecording(false);
       setRecordingTime(0);
       
-      // 生成文件名
       const timestamp = new Date().toISOString().replace(/:/g, '-').split('.')[0];
       const filename = `recording_${timestamp}.webm`;
       
-      // 下载录制的视频
       await recorderRef.current.downloadRecording(blob, filename);
     } catch (error) {
       console.error('停止录制失败:', error);
@@ -823,7 +752,6 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
                 <span className="font-medium">涂鸦标注</span>
               </button>
 
-              {/* 录制按钮 */}
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -849,12 +777,9 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
                   {isRecording ? `录制中 ${formatRecordingTime(recordingTime)}` : '录制'}
                 </span>
               </button>
-
-              {/* 实时涂鸦按钮 - 播放时也可用 */}
             </div>
           )}
 
-          {/* 实时涂鸦按钮 - 独立显示，播放时可用 */}
           {!showDrawingCanvas && (
             <div className="absolute top-4 right-4 z-20">
               <button
@@ -878,16 +803,13 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
                   onClick={(e) => {
                     e.stopPropagation();
                     
-                    // 情况A：搜索列表打开 且 涂鸦列表也打开 → 只关闭搜索列表
                     if (isSearchPanelOpen && showAnnotationsList) {
                       onCloseSearchPanel?.();
                     }
-                    // 情况C：涂鸦列表未打开 → 正常打开
                     else if (!showAnnotationsList) {
                       setShowAnnotationsList(true);
                       onSetActivePanel?.('annotations');
                     }
-                    // 情况B：涂鸦列表已在前 → 什么都不做
                   }}
                   className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg shadow-lg transition-all hover:scale-105 relative"
                   title="查看涂鸦列表"
@@ -1034,16 +956,13 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
 
                   <button
                     onClick={() => {
-                      // 情况A：搜索列表打开 且 涂鸦列表也打开 → 只关闭搜索列表
                       if (isSearchPanelOpen && showAnnotationsList) {
                         onCloseSearchPanel?.();
                       }
-                      // 情况C：涂鸦列表未打开 → 正常打开
                       else if (!showAnnotationsList) {
                         setShowAnnotationsList(true);
                         onSetActivePanel?.('annotations');
                       }
-                      // 情况B：涂鸦列表已在前 → 什么都不做
                     }}
                     className="flex items-center gap-2 px-3 py-1 bg-purple-600 hover:bg-purple-500 text-white rounded transition relative"
                     title="涂鸦列表"
@@ -1069,14 +988,6 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
                   </select>
 
                   <button
-                    onClick={() => showSettings ? handleCancelSettings() : openSettings()}
-                    className="text-white hover:text-blue-400 transition-colors"
-                    title="设置"
-                  >
-                    <Settings size={20} />
-                  </button>
-
-                  <button
                     onClick={toggleFullscreen}
                     className="text-white hover:text-blue-400 transition-colors"
                     title="全屏 (F)"
@@ -1088,7 +999,6 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
             </div>
           </div>
 
-          {/* 实时涂鸦回放 - 必须在relative容器内 */}
           {showLivePlayback && currentPlaybackData && videoRef.current && (
             <LiveDrawingReplay
               videoElement={videoRef.current}
@@ -1119,7 +1029,6 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
         />
       )}
 
-      {/* 实时涂鸦覆盖层 */}
       <LiveDrawingOverlay
         videoElement={videoRef.current}
         isActive={showLiveDrawing}
@@ -1157,280 +1066,6 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
                 isActive={activePanel === 'annotations'}
                 onFocus={() => onSetActivePanel?.('annotations')}
               />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showSettings && (
-        <div className="fixed top-4 right-4 w-96 max-h-[calc(100vh-2rem)] z-50 flex flex-col">
-          <div className="bg-gray-900 rounded-lg shadow-2xl border border-gray-700 flex flex-col h-full max-h-full">
-            <div className="flex items-center justify-between p-4 border-b border-gray-700 flex-shrink-0">
-              <h3 className="text-white font-semibold flex items-center gap-2">
-                <Settings size={18} />
-                涂鸦回放设置
-              </h3>
-              <button
-                onClick={handleCancelSettings}
-                className="text-gray-400 hover:text-white transition"
-              >
-                <span className="text-xl">×</span>
-              </button>
-            </div>
-            <div className="p-4 space-y-6 overflow-y-auto flex-1 min-h-0">
-              {/* 录制设置 - 移到顶部 */}
-              <div className="pb-4 border-b border-gray-700">
-                <label className="text-white text-sm font-medium mb-3 block">
-                  录制设置
-                </label>
-                
-                <div className="space-y-3">
-                  <div>
-                    <label className="text-gray-300 text-xs mb-2 block">录制模式</label>
-                    <select
-                      value={recordingMode}
-                      onChange={(e) => setRecordingMode(e.target.value as RecordingMode)}
-                      className="w-full bg-gray-700 text-white px-3 py-2 rounded text-sm"
-                    >
-                      <option value="player">播放器+涂鸦</option>
-                      <option value="screen">屏幕录制</option>
-                    </select>
-                    <p className="text-gray-400 text-xs mt-1">
-                      {recordingMode === 'player' 
-                        ? '录制播放器内容和涂鸦标注，适合制作教学视频' 
-                        : '录制整个屏幕或窗口，可录制YouTube等任意内容'}
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id="includeMic"
-                      checked={includeMicrophone}
-                      onChange={(e) => setIncludeMicrophone(e.target.checked)}
-                      className="w-4 h-4 rounded"
-                    />
-                    <label htmlFor="includeMic" className="text-gray-300 text-sm flex items-center gap-2">
-                      {includeMicrophone ? <Mic size={16} /> : <MicOff size={16} />}
-                      录制麦克风音频
-                    </label>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label className="text-white text-sm font-medium mb-2 block">
-                  涂鸦回放缓冲设置
-                </label>
-                <p className="text-gray-400 text-xs mb-3">
-                  点击涂鸦列表中的标注时，视频将从标注前{tempReplayBufferBefore}秒开始播放，直到标注后{tempReplayBufferAfter}秒后暂停
-                </p>
-
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-gray-300 text-xs mb-2 block">回放前缓冲时间</label>
-                    <div className="flex items-center gap-4">
-                      <input
-                        type="range"
-                        min="0"
-                        max="300"
-                        step="1"
-                        value={tempReplayBufferBefore}
-                        onChange={(e) => {
-                          const val = parseFloat(e.target.value);
-                          setTempReplayBufferBefore(val);
-                          if (tempVideoSegmentSettings.syncWithReplay) {
-                            setTempVideoSegmentSettings({ ...tempVideoSegmentSettings, beforeBuffer: val });
-                          }
-                        }}
-                        className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                      />
-                      <div className="flex items-center gap-1 min-w-[80px]">
-                        <input
-                          type="number"
-                          min="0"
-                          max="300"
-                          value={tempReplayBufferBefore}
-                          onChange={(e) => {
-                            const val = Math.max(0, Math.min(300, parseFloat(e.target.value) || 0));
-                            setTempReplayBufferBefore(val);
-                            if (tempVideoSegmentSettings.syncWithReplay) {
-                              setTempVideoSegmentSettings({ ...tempVideoSegmentSettings, beforeBuffer: val });
-                            }
-                          }}
-                          className="w-16 px-2 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-blue-500 outline-none"
-                        />
-                        <span className="text-white text-sm">秒</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="text-gray-300 text-xs mb-2 block">回放后缓冲时间</label>
-                    <div className="flex items-center gap-4">
-                      <input
-                        type="range"
-                        min="0"
-                        max="300"
-                        step="1"
-                        value={tempReplayBufferAfter}
-                        onChange={(e) => {
-                          const val = parseFloat(e.target.value);
-                          setTempReplayBufferAfter(val);
-                          if (tempVideoSegmentSettings.syncWithReplay) {
-                            setTempVideoSegmentSettings({ ...tempVideoSegmentSettings, afterBuffer: val });
-                          }
-                        }}
-                        className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                      />
-                      <div className="flex items-center gap-1 min-w-[80px]">
-                        <input
-                          type="number"
-                          min="0"
-                          max="300"
-                          value={tempReplayBufferAfter}
-                          onChange={(e) => {
-                            const val = Math.max(0, Math.min(300, parseFloat(e.target.value) || 0));
-                            setTempReplayBufferAfter(val);
-                            if (tempVideoSegmentSettings.syncWithReplay) {
-                              setTempVideoSegmentSettings({ ...tempVideoSegmentSettings, afterBuffer: val });
-                            }
-                          }}
-                          className="w-16 px-2 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-blue-500 outline-none"
-                        />
-                        <span className="text-white text-sm">秒</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="border-t border-gray-700 pt-4">
-                <label className="text-white text-sm font-medium mb-2 block">
-                  视频片段保存设置
-                </label>
-                <p className="text-gray-400 text-xs mb-3">
-                  点击涂鸦画布中的紫色时钟按钮保存视频片段时，自动添加的前后缓冲时间
-                </p>
-
-                <label className="flex items-center gap-2 mb-4 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={tempVideoSegmentSettings.syncWithReplay || false}
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      setTempVideoSegmentSettings({
-                        ...tempVideoSegmentSettings,
-                        syncWithReplay: checked,
-                        beforeBuffer: checked ? tempReplayBufferBefore : tempVideoSegmentSettings.beforeBuffer,
-                        afterBuffer: checked ? tempReplayBufferAfter : tempVideoSegmentSettings.afterBuffer
-                      });
-                    }}
-                    className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-blue-600 focus:ring-2 focus:ring-blue-500"
-                  />
-                  <span className="text-gray-300 text-sm">与回放时间保持一致</span>
-                </label>
-
-                <div className={`space-y-4 ${tempVideoSegmentSettings.syncWithReplay ? 'opacity-50' : ''}`}>
-                  <div>
-                    <label className="text-gray-300 text-xs mb-2 block">前缓冲时间</label>
-                    <div className="flex items-center gap-4">
-                      <input
-                        type="range"
-                        min="0"
-                        max="300"
-                        step="1"
-                        value={tempVideoSegmentSettings.syncWithReplay ? tempReplayBufferBefore : tempVideoSegmentSettings.beforeBuffer}
-                        onChange={(e) => {
-                          if (!tempVideoSegmentSettings.syncWithReplay) {
-                            setTempVideoSegmentSettings({ ...tempVideoSegmentSettings, beforeBuffer: Number(e.target.value) });
-                          }
-                        }}
-                        disabled={tempVideoSegmentSettings.syncWithReplay}
-                        className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer disabled:cursor-not-allowed"
-                      />
-                      <div className="flex items-center gap-1 min-w-[80px]">
-                        <input
-                          type="number"
-                          min="0"
-                          max="300"
-                          value={tempVideoSegmentSettings.syncWithReplay ? tempReplayBufferBefore : tempVideoSegmentSettings.beforeBuffer}
-                          onChange={(e) => {
-                            if (!tempVideoSegmentSettings.syncWithReplay) {
-                              const val = Math.max(0, Math.min(300, Number(e.target.value) || 0));
-                              setTempVideoSegmentSettings({ ...tempVideoSegmentSettings, beforeBuffer: val });
-                            }
-                          }}
-                          disabled={tempVideoSegmentSettings.syncWithReplay}
-                          className="w-16 px-2 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-blue-500 outline-none disabled:cursor-not-allowed"
-                        />
-                        <span className="text-white text-sm">秒</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="text-gray-300 text-xs mb-2 block">后缓冲时间</label>
-                    <div className="flex items-center gap-4">
-                      <input
-                        type="range"
-                        min="0"
-                        max="300"
-                        step="1"
-                        value={tempVideoSegmentSettings.syncWithReplay ? tempReplayBufferAfter : tempVideoSegmentSettings.afterBuffer}
-                        onChange={(e) => {
-                          if (!tempVideoSegmentSettings.syncWithReplay) {
-                            setTempVideoSegmentSettings({ ...tempVideoSegmentSettings, afterBuffer: Number(e.target.value) });
-                          }
-                        }}
-                        disabled={tempVideoSegmentSettings.syncWithReplay}
-                        className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer disabled:cursor-not-allowed"
-                      />
-                      <div className="flex items-center gap-1 min-w-[80px]">
-                        <input
-                          type="number"
-                          min="0"
-                          max="300"
-                          value={tempVideoSegmentSettings.syncWithReplay ? tempReplayBufferAfter : tempVideoSegmentSettings.afterBuffer}
-                          onChange={(e) => {
-                            if (!tempVideoSegmentSettings.syncWithReplay) {
-                              const val = Math.max(0, Math.min(300, Number(e.target.value) || 0));
-                              setTempVideoSegmentSettings({ ...tempVideoSegmentSettings, afterBuffer: val });
-                            }
-                          }}
-                          disabled={tempVideoSegmentSettings.syncWithReplay}
-                          className="w-16 px-2 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-blue-500 outline-none disabled:cursor-not-allowed"
-                        />
-                        <span className="text-white text-sm">秒</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-gray-800 rounded p-3 text-xs text-gray-400">
-                <p className="mb-1">💡 使用说明：</p>
-                <ul className="list-disc list-inside space-y-1">
-                  <li><strong>回放缓冲</strong>：点击涂鸦列表中的标注时，可设置向前回放和向后播放的时间</li>
-                  <li><strong>片段保存</strong>：点击涂鸦画布中紫色时钟按钮时，可设置保存片段的前后范围</li>
-                  <li><strong>手动保存</strong>：橙色摄像机按钮可手动选择任意保存范围</li>
-                </ul>
-              </div>
-            </div>
-
-            <div className="flex gap-3 p-4 border-t border-gray-700 flex-shrink-0">
-              <button
-                onClick={handleSaveSettings}
-                className="flex-1 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded transition"
-              >
-                保存设置
-              </button>
-              <button
-                onClick={handleCancelSettings}
-                className="flex-1 bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded transition"
-              >
-                取消
-              </button>
             </div>
           </div>
         </div>
