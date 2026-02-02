@@ -12,8 +12,10 @@ import { ButtonCustomizationSettings } from './components/ButtonCustomizationSet
 import { ButtonImageUpload } from './components/ButtonImageUpload';
 import { SearchResultsPanel } from './components/SearchResultsPanel';
 import { VideoFile } from './types/video';
+import { VideoSegmentSettings } from './types/videoSegment';
 import { useButtonCustomization } from './hooks/useButtonCustomization';
 import { globalSearch } from './utils/globalSearch';
+import { RecordingMode } from './utils/screenRecorder';
 import {
   requestDirectoryAccess,
   loadVideosFromDirectory,
@@ -30,7 +32,8 @@ import {
   getVideoProgress,
   saveVideoProgress,
   savePlaylist,
-  getAnnotations
+  getAnnotations,
+  getVideoSegmentSettings
 } from './utils/database';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 
@@ -70,6 +73,25 @@ function App() {
   const addFileInputRef = useRef<HTMLInputElement>(null);
   const [useFileSystemAccess, setUseFileSystemAccess] = useState(true);
   const currentVideoPathRef = useRef<string>('');
+
+  // 录制设置状态
+  const [recordingMode, setRecordingMode] = useState<RecordingMode>('player');
+  const [includeMicrophone, setIncludeMicrophone] = useState(false);
+
+  // 回放设置状态
+  const [replayBufferBefore, setReplayBufferBefore] = useState<number>(() => {
+    const saved = localStorage.getItem('replayBufferBefore');
+    return saved ? parseFloat(saved) : 10;
+  });
+  const [replayBufferAfter, setReplayBufferAfter] = useState<number>(() => {
+    const saved = localStorage.getItem('replayBufferAfter');
+    return saved ? parseFloat(saved) : 5;
+  });
+  const [videoSegmentSettings, setVideoSegmentSettings] = useState<VideoSegmentSettings>({
+    beforeBuffer: 15,
+    afterBuffer: 20,
+    syncWithReplay: false
+  });
 
   const {
     settings: buttonSettings,
@@ -132,7 +154,6 @@ function App() {
   const [activePanel, setActivePanel] = useState<ActivePanel>(null);
 
   const handleGlobalSearch = async () => {
-    // 如果既没有关键词，也没有启用筛选条件，则不搜索
     if (!globalSearchQuery.trim() && !durationFilter.enabled && !annotationCountFilter.enabled) {
       setGlobalSearchResults([]);
       setIsGlobalSearchOpen(false);
@@ -174,7 +195,7 @@ function App() {
     if (video) {
       const index = videos.findIndex(v => v.name === video.name);
       if (index >= 0) {
-        const bufferBefore = parseFloat(localStorage.getItem('replayBufferBefore') || '10');
+        const bufferBefore = replayBufferBefore;
         setPendingSeekTime(Math.max(0, timestamp - bufferBefore));
         handleSelectVideo(index);
       }
@@ -194,6 +215,15 @@ function App() {
       console.log('File System Access API not supported, using file input fallback');
       setUseFileSystemAccess(false);
     }
+  }, []);
+
+  // 加载视频片段设置
+  useEffect(() => {
+    const loadSettings = async () => {
+      const settings = await getVideoSegmentSettings();
+      setVideoSegmentSettings(settings);
+    };
+    loadSettings();
   }, []);
 
   const loadAnnotationCounts = useCallback(async () => {
@@ -386,6 +416,7 @@ function App() {
       fileInputRef.current?.click();
     }
   };
+
   const handleFileInputChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (files && files.length > 0) {
@@ -504,7 +535,6 @@ function App() {
     const [movedVideo] = newVideos.splice(startIndex, 1);
     newVideos.splice(endIndex, 0, movedVideo);
     
-    // 更新order字段
     const updatedVideos = newVideos.map((video, index) => ({
       ...video,
       order: index
@@ -512,7 +542,6 @@ function App() {
     
     setVideos(updatedVideos);
     
-    // 更新currentIndex
     if (currentIndex === startIndex) {
       setCurrentIndex(endIndex);
     } else if (startIndex < currentIndex && endIndex >= currentIndex) {
@@ -521,19 +550,16 @@ function App() {
       setCurrentIndex(currentIndex + 1);
     }
     
-    // 保存到数据库
     savePlaylist(updatedVideos);
   };
 
   const handleSelectVideo = async (index: number) => {
     console.log('handleSelectVideo called with index:', index, 'currentIndex:', currentIndex);
     if (index >= 0 && index < videos.length) {
-      // 检查是否是当前视频且已加载
       if (index === currentIndex) {
         const video = document.querySelector('video');
         console.log('Same index selected. video.src:', video?.src);
         if (video && video.src) {
-          // 视频已加载,切换播放/暂停状态
           console.log('Video loaded, toggling play/pause');
           if (video.paused) {
             video.play();
@@ -542,7 +568,6 @@ function App() {
           }
           return;
         }
-        // 如果video.src未加载,继续执行加载逻辑,不要return
         console.log('Video not loaded, will load it');
       }
 
@@ -604,13 +629,12 @@ function App() {
   const handleSwitchVideo = useCallback((videoId: string, timestamp: number) => {
     const targetIndex = videos.findIndex(v => (v.url || v.path) === videoId);
     if (targetIndex >= 0) {
-      // 应用replayBufferBefore设置,与同视频播放行为一致
-      const bufferBefore = parseFloat(localStorage.getItem('replayBufferBefore') || '10');
+      const bufferBefore = replayBufferBefore;
       const startTime = Math.max(0, timestamp - bufferBefore);
       setPendingSeekTime(startTime);
       handleSelectVideo(targetIndex);
     }
-  }, [videos, handleSelectVideo]);
+  }, [videos, handleSelectVideo, replayBufferBefore]);
 
   const handleVideoEnded = useCallback(() => {
     if (playMode === 'sequential') {
@@ -636,7 +660,6 @@ function App() {
       const currentVideo = videos[currentIndex];
       if (!currentVideo) return;
 
-      // Update in memory without triggering state update
       currentVideo.progress = currentTime;
       if (duration > 0) {
         currentVideo.duration = duration;
@@ -659,7 +682,6 @@ function App() {
 
   const handleLoadedMetadata = useCallback((duration: number) => {
     if (videos.length > 0 && currentIndex >= 0 && duration > 0) {
-      // Update in memory without triggering state update
       videos[currentIndex].duration = duration;
     }
     if (pendingSeekTime !== null) {
@@ -745,11 +767,9 @@ function App() {
     }
   }, [videos, currentIndex]);
 
-  // 点击外部关闭搜索下拉菜单
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
-      // 检查点击是否在搜索框或下拉菜单外部
       if (showSearchDropdown && 
           !target.closest('.search-dropdown-container')) {
         setShowSearchDropdown(false);
@@ -764,7 +784,7 @@ function App() {
     }
   }, [showSearchDropdown]);
 
-    useKeyboardShortcuts({
+  useKeyboardShortcuts({
     onPlayPause: handlePlayPause,
     onSkipForward: handleSkipForward,
     onSkipBackward: handleSkipBackward,
@@ -801,7 +821,6 @@ function App() {
             )}
           </div>
 
-          {/* 全局搜索框 */}
           {videos.length > 0 && (
             <div className="flex items-center gap-2">
               <div className="relative search-dropdown-container">
@@ -1005,7 +1024,7 @@ function App() {
                 setIsSettingsOpen(true);
               }}
               className="bg-gray-800 text-white p-2 rounded hover:bg-gray-700 transition-colors flex items-center justify-center"
-              title="按钮设置"
+              title="设置"
             >
               <Settings size={32} />
             </button>
@@ -1060,6 +1079,11 @@ function App() {
               onSetActivePanel={setActivePanel}
               isSearchPanelOpen={isGlobalSearchOpen}
               onCloseSearchPanel={handleCloseGlobalSearch}
+              recordingMode={recordingMode}
+              includeMicrophone={includeMicrophone}
+              replayBufferBefore={replayBufferBefore}
+              replayBufferAfter={replayBufferAfter}
+              videoSegmentSettings={videoSegmentSettings}
             />
           </div>
         </div>
@@ -1081,7 +1105,6 @@ function App() {
             onReorderVideos={handleReorderVideos}
           />
           
-          {/* 全局搜索结果面板 */}
           <SearchResultsPanel
             results={globalSearchResults}
             isVisible={isGlobalSearchOpen}
@@ -1115,6 +1138,16 @@ function App() {
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         onSettingsChange={refreshButtonData}
+        recordingMode={recordingMode}
+        setRecordingMode={setRecordingMode}
+        includeMicrophone={includeMicrophone}
+        setIncludeMicrophone={setIncludeMicrophone}
+        replayBufferBefore={replayBufferBefore}
+        setReplayBufferBefore={setReplayBufferBefore}
+        replayBufferAfter={replayBufferAfter}
+        setReplayBufferAfter={setReplayBufferAfter}
+        videoSegmentSettings={videoSegmentSettings}
+        setVideoSegmentSettings={setVideoSegmentSettings}
       />
 
       <ButtonImageUpload
