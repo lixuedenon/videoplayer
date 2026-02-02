@@ -1,3 +1,6 @@
+// src/types/annotation.ts
+// TypeScript类型定义文件
+
 export type DrawingTool = 'select' | 'pen' | 'eraser' | 'line' | 'arrow' | 'rectangle' | 'circle' | 'highlighter' | 'checkmark' | 'cross' | 'number1' | 'number2' | 'number3' | 'text';
 
 export interface Point {
@@ -53,9 +56,21 @@ export interface LiveStroke {
   // 文字相关字段
   text?: string;
   fontSize?: number;
-  // 形状相关字段
-  shapeType?: 'circle' | 'rectangle' | 'line' | 'arrow' | 'triangle' | 'star' | 'hexagon' | 'diamond' | 'roundRect';
+  // 形状相关字段 - 完整的35种形状类型定义
+  shapeType?: 'freepen' 
+    // 基础形状
+    | 'circle' | 'rectangle' | 'roundRect' | 'diamond' 
+    | 'triangleUp' | 'triangleDown' | 'triangleLeft' | 'triangleRight' 
+    | 'hexagon' | 'star'
+    // 线条类
+    | 'line' | 'vertical' | 'horizontal' | 'diagonal45' | 'diagonal135' | 'parallel'
+    | 'lShape' | 'zShape' | 'arrowBoth' | 'arrowRight' | 'arrowLeft' | 'arrowUp' | 'arrowDown'
+    // 标注类
+    | 'cloud' | 'speech' | 'thought' | 'dashedBox' | 'bracket' | 'bookQuote'
+    // 数学/专业
+    | 'angle' | 'perpendicular' | 'parallelSymbol' | 'arc' | 'circlePlus' | 'circleCross';
   filled?: boolean;
+  rotation?: number;  // 旋转角度（度数，0-360）
 }
 
 // 动态涂鸦数据
