@@ -655,8 +655,7 @@ export const AnnotationsList: React.FC<AnnotationsListProps> = ({
               </button>
             </div>
           </div>
-        </div>
-        ))}
+          ))}
         </div>
       ) : null}
     </div>
