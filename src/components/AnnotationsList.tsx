@@ -270,7 +270,17 @@ export const AnnotationsList: React.FC<AnnotationsListProps> = ({
         }
 
         try {
-          await downloadVideoSegment(videoElement, startTime, endTime, filename);
+          await downloadVideoSegment(
+            videoElement, 
+            startTime, 
+            endTime, 
+            filename,
+            // 如果有涂鸦数据，传入
+            annotation.live_drawing_data ? {
+              liveDrawingData: annotation.live_drawing_data,
+              startTimestamp: annotation.timestamp
+            } : undefined
+          );
           if (!aborted) {
             resolve();
           }
