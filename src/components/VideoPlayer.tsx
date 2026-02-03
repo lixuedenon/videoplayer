@@ -738,8 +738,9 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
             style={{ zIndex: 1 }}
           />
 
+          {/* 涂鸦标注按钮 - 只在暂停时显示 */}
           {!isPlaying && (
-            <div className="absolute top-4 right-4 flex gap-2 z-20">
+            <div className="absolute top-4 left-4 z-20">
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -751,34 +752,37 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
                 <Paintbrush size={20} />
                 <span className="font-medium">涂鸦标注</span>
               </button>
-
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (isRecording) {
-                    stopRecording();
-                  } else {
-                    startRecording();
-                  }
-                }}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg shadow-lg transition-all hover:scale-105 ${
-                  isRecording 
-                    ? 'bg-red-600 hover:bg-red-500 animate-pulse' 
-                    : 'bg-green-600 hover:bg-green-500'
-                } text-white`}
-                title={
-                  isRecording 
-                    ? '停止录制' 
-                    : `开始录制 (${recordingMode === 'player' ? '播放器+涂鸦' : '屏幕录制'})`
-                }
-              >
-                {isRecording ? <Square size={20} /> : <Circle size={20} />}
-                <span className="font-medium">
-                  {isRecording ? `录制中 ${formatRecordingTime(recordingTime)}` : '录制'}
-                </span>
-              </button>
             </div>
           )}
+
+          {/* 录制按钮 - 始终显示 */}
+          <div className="absolute top-4 right-4 z-20">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                if (isRecording) {
+                  stopRecording();
+                } else {
+                  startRecording();
+                }
+              }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg shadow-lg transition-all hover:scale-105 ${
+                isRecording 
+                  ? 'bg-red-600 hover:bg-red-500 animate-pulse' 
+                  : 'bg-green-600 hover:bg-green-500'
+              } text-white`}
+              title={
+                isRecording 
+                  ? '停止录制' 
+                  : `开始录制 (${recordingMode === 'player' ? '播放器+涂鸦' : '屏幕录制'})`
+              }
+            >
+              {isRecording ? <Square size={20} /> : <Circle size={20} />}
+              <span className="font-medium">
+                {isRecording ? `录制中 ${formatRecordingTime(recordingTime)}` : '录制'}
+              </span>
+            </button>
+          </div>
 
           {!showDrawingCanvas && (
             <div className="absolute top-4 right-4 z-20">
