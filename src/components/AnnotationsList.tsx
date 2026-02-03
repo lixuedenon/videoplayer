@@ -554,11 +554,11 @@ export const AnnotationsList: React.FC<AnnotationsListProps> = ({
       ) : !isSearchMode ? (
         <div className="space-y-3 max-h-96 overflow-y-auto">
           {videoAnnotations.map(annotation => (
-          <div
-            key={annotation.id}
-            className="bg-gray-700 rounded-lg overflow-hidden hover:bg-gray-600 transition group"
-          >
-            <div className="flex items-start gap-2 p-2">
+            <div
+              key={annotation.id}
+              className="bg-gray-700 rounded-lg overflow-hidden hover:bg-gray-600 transition group"
+            >
+              <div className="flex items-start gap-2 p-2">
               <input
                 type="checkbox"
                 checked={selectedIds.has(annotation.id)}
@@ -654,10 +654,11 @@ export const AnnotationsList: React.FC<AnnotationsListProps> = ({
                 删除
               </button>
             </div>
+            </div>
           </div>
           ))}
         </div>
-      )}
+      ) : null}
     </div>
   );
 };
