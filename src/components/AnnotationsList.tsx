@@ -90,6 +90,11 @@ export const AnnotationsList: React.FC<AnnotationsListProps> = ({
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isSearchMode, setIsSearchMode] = useState(false);
   const [isExactMatch, setIsExactMatch] = useState(false);
+  
+  // 批量下载相关状态
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isBatchDownloading, setIsBatchDownloading] = useState(false);
+  const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 });
 
   const videoAnnotations = annotations.filter(a => a.video_url === currentVideoUrl);
 
@@ -309,12 +314,91 @@ export const AnnotationsList: React.FC<AnnotationsListProps> = ({
     }
   };
 
+  // 批量下载处理
+  const handleBatchDownload = async () => {
+    if (selectedIds.size === 0) {
+      alert('请至少选择一个标注');
+      return;
+    }
+
+    const selectedAnnotations = videoAnnotations.filter(a => selectedIds.has(a.id));
+    
+    if (!window.confirm(`确定要下载 ${selectedAnnotations.length} 个标注视频吗？`)) {
+      return;
+    }
+
+    setIsBatchDownloading(true);
+    setBatchProgress({ current: 0, total: selectedAnnotations.length });
+
+    for (let i = 0; i < selectedAnnotations.length; i++) {
+      try {
+        await handleDownloadSegment(selectedAnnotations[i]);
+        setBatchProgress({ current: i + 1, total: selectedAnnotations.length });
+      } catch (error) {
+        console.error(`下载第 ${i + 1} 个标注失败:`, error);
+      }
+    }
+
+    setIsBatchDownloading(false);
+    setSelectedIds(new Set());
+    alert(`批量下载完成！成功 ${selectedAnnotations.length} 个文件`);
+  };
+
+  // 全选/取消全选
+  const handleToggleSelectAll = () => {
+    if (selectedIds.size === videoAnnotations.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(videoAnnotations.map(a => a.id)));
+    }
+  };
+
   return (
     <div className="bg-gray-800 rounded-lg p-4">
-      <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
-        <Clock size={18} />
-        涂鸦列表 ({annotations.length})
-      </h3>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-white font-semibold flex items-center gap-2">
+          <Clock size={18} />
+          涂鸦列表 ({annotations.length})
+        </h3>
+        
+        {!isSearchMode && videoAnnotations.length > 0 && (
+          <div className="flex gap-2">
+            <button
+              onClick={handleToggleSelectAll}
+              className="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white text-xs rounded transition"
+              title={selectedIds.size === videoAnnotations.length ? '取消全选' : '全选'}
+            >
+              {selectedIds.size === videoAnnotations.length ? '取消全选' : '全选'}
+            </button>
+            
+            {selectedIds.size > 0 && (
+              <button
+                onClick={handleBatchDownload}
+                disabled={isBatchDownloading}
+                className="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white text-xs rounded transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                title={`批量下载 ${selectedIds.size} 个标注`}
+              >
+                <Download size={14} />
+                批量下载 ({selectedIds.size})
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+      
+      {isBatchDownloading && (
+        <div className="mb-4 p-3 bg-blue-900 rounded-lg">
+          <div className="text-white text-sm mb-2">
+            批量下载中... {batchProgress.current} / {batchProgress.total}
+          </div>
+          <div className="w-full bg-gray-700 rounded-full h-2">
+            <div 
+              className="bg-blue-500 h-2 rounded-full transition-all"
+              style={{ width: `${(batchProgress.current / batchProgress.total) * 100}%` }}
+            />
+          </div>
+        </div>
+      )}
 
       <div className="mb-4">
         <div className="flex gap-2 mb-2">
@@ -474,10 +558,29 @@ export const AnnotationsList: React.FC<AnnotationsListProps> = ({
             key={annotation.id}
             className="bg-gray-700 rounded-lg overflow-hidden hover:bg-gray-600 transition group"
           >
-            <button
-              onClick={() => handleAnnotationClick(annotation)}
-              className="w-full text-left"
-            >
+            <div className="flex items-start gap-2 p-2">
+              <input
+                type="checkbox"
+                checked={selectedIds.has(annotation.id)}
+                onChange={(e) => {
+                  const newSet = new Set(selectedIds);
+                  if (e.target.checked) {
+                    newSet.add(annotation.id);
+                  } else {
+                    newSet.delete(annotation.id);
+                  }
+                  setSelectedIds(newSet);
+                }}
+                onClick={(e) => e.stopPropagation()}
+                className="mt-1 w-4 h-4 rounded cursor-pointer"
+                disabled={isBatchDownloading}
+              />
+              
+              <div className="flex-1">
+                <button
+                  onClick={() => handleAnnotationClick(annotation)}
+                  className="w-full text-left"
+                >
               {annotation.thumbnail && (
                 <ThumbnailImage
                   thumbnail={annotation.thumbnail}
@@ -552,6 +655,7 @@ export const AnnotationsList: React.FC<AnnotationsListProps> = ({
               </button>
             </div>
           </div>
+        </div>
         ))}
         </div>
       ) : null}
