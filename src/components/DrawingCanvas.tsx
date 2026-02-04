@@ -1,7 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Pencil, Eraser, ArrowRight, Circle, Square, Undo, Redo, Trash2, Save, X, MousePointer, Minus, Highlighter, Check, XIcon, Camera, Clock, Video, Type } from 'lucide-react';
 import type { DrawingTool, DrawingElement, Point, DrawingStroke, ShapeAnnotation, TextAnnotation, DrawingData } from '../types/annotation';
-import { ManualSegmentDialog } from './ManualSegmentDialog';
 import { NameInputDialog } from './NameInputDialog';
 import { downloadVideoSegment, extractTextFromDrawingData } from '../utils/videoSegmentDownload';
 import { getVideoSegmentSettings, saveVideoSegment } from '../utils/database';
@@ -28,7 +27,6 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ videoElement, onSa
   const [shapeStart, setShapeStart] = useState<Point | null>(null);
   const [selectedElementIndex, setSelectedElementIndex] = useState<number | null>(null);
   const [dragOffset, setDragOffset] = useState<Point | null>(null);
-  const [isManualSegmentDialogOpen, setIsManualSegmentDialogOpen] = useState(false);
   const [isSavingSegment, setIsSavingSegment] = useState(false);
   const [fontSize, setFontSize] = useState(24);
   const [isTextInputMode, setIsTextInputMode] = useState(false);
@@ -592,19 +590,6 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ videoElement, onSa
     }
   };
 
-  const handleManualSegmentDownload = async (startTime: number, endTime: number) => {
-    const success = await downloadVideoSegment(
-      videoElement,
-      startTime,
-      endTime,
-      videoName
-    );
-
-    if (success) {
-      alert(`视频片段已下载！\n时间范围：${startTime.toFixed(1)}s - ${endTime.toFixed(1)}s`);
-    }
-  };
-
   const tools: { tool: DrawingTool; icon: React.ReactNode; label: string; isText?: boolean }[] = [
     { tool: 'select', icon: <MousePointer size={16} />, label: '选择' },
     { tool: 'pen', icon: <Pencil size={16} />, label: '画笔' },
@@ -766,15 +751,6 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ videoElement, onSa
                 <Clock size={16} />
               </div>
             </button>
-            <button
-              onClick={() => setIsManualSegmentDialogOpen(true)}
-              className="p-1.5 bg-orange-600 hover:bg-orange-500 rounded-lg text-white transition"
-              title="手动选择视频片段并下载"
-            >
-              <div className="w-5 h-5 flex items-center justify-center">
-                <Video size={16} />
-              </div>
-            </button>
           </div>
         </div>
 
@@ -790,14 +766,6 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ videoElement, onSa
           />
         </div>
       </div>
-
-      <ManualSegmentDialog
-        isOpen={isManualSegmentDialogOpen}
-        onClose={() => setIsManualSegmentDialogOpen(false)}
-        currentTime={videoElement.currentTime}
-        duration={videoElement.duration}
-        onDownload={handleManualSegmentDownload}
-      />
 
       <NameInputDialog
         isOpen={isNameDialogOpen}
