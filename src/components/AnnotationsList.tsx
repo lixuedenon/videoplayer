@@ -216,7 +216,7 @@ export const AnnotationsList: React.FC<AnnotationsListProps> = ({
   };
 
   const handleAnnotationClick = (annotation: Annotation) => {
-    onSeek(annotation);
+    onSeek(annotation.timestamp, annotation.video_url);
   };
 
   const handleDownload = (annotation: Annotation) => {
@@ -315,7 +315,7 @@ export const AnnotationsList: React.FC<AnnotationsListProps> = ({
     
     for (let i = 0; i < selected.length; i++) {
       try {
-        await handleDownloadSegment(selected[i]);
+        await handleDownloadVideo(selected[i]);
         setBatchProgress({ current: i + 1, total: selected.length });
       } catch (error) {
         console.error(`下载第 ${i + 1} 个标注失败:`, error);

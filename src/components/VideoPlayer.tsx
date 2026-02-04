@@ -1243,7 +1243,14 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
               <AnnotationsList
                 annotations={annotations}
                 currentVideoUrl={videoId || ''}
-                onSeek={handleSeekToAnnotation}
+                onSeek={(timestamp, targetVideoId) => {
+                  const annotation = annotations.find(a => a.timestamp === timestamp && (!targetVideoId || a.video_url === targetVideoId));
+                  if (annotation) {
+                    handleSeekToAnnotation(annotation);
+                  } else if (videoRef.current) {
+                    videoRef.current.currentTime = timestamp;
+                  }
+                }}
                 onDelete={handleDeleteAnnotation}
                 videoElement={videoRef.current}
                 videoSegmentSettings={videoSegmentSettings}
