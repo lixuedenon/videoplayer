@@ -24,7 +24,6 @@ import { DrawingCanvas } from './DrawingCanvas';
 import { LiveDrawingOverlay } from './LiveDrawingOverlay';
 import { LiveDrawingReplay } from './LiveDrawingReplay';
 import { AnnotationsList } from './AnnotationsList';
-import { ManualSegmentDialog } from './ManualSegmentDialog';
 import { Annotation, DrawingData } from '../types/annotation';
 import { saveAnnotation, getAnnotations, deleteAnnotation } from '../utils/database';
 import { VideoSegmentSettings } from '../types/videoSegment';
@@ -130,7 +129,9 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [selectedRecordingMode, setSelectedRecordingMode] = useState<'drawing' | 'segment' | 'screen'>('drawing');
-  const [showSegmentDialog, setShowSegmentDialog] = useState(false);
+  const [segmentMarkers, setSegmentMarkers] = useState<{ start: number | null; end: number | null }>({ start: null, end: null });
+  const [isSegmentMode, setIsSegmentMode] = useState(false);
+  const [isCuttingVideo, setIsCuttingVideo] = useState(false);
   const recorderRef = useRef<ScreenRecorder>(new ScreenRecorder());
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
   const seekTargetEndTime = useRef<number | null>(null);
@@ -595,9 +596,11 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
 
   const startRecording = async () => {
     try {
-      // 如果选择的是片段下载，打开对话框而不是录制
+      // 如果选择了片段截取，进入标记模式
       if (selectedRecordingMode === 'segment') {
-        setShowSegmentDialog(true);
+        setIsSegmentMode(true);
+        setSegmentMarkers({ start: null, end: null });
+        alert('片段截取模式：\n1. 点击进度条设置起始点\n2. 再次点击设置结束点\n3. 点击"截取"按钮完成');
         return;
       }
       
@@ -720,6 +723,72 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
       endTime,
       filename
     );
+  };
+
+  const handleProgressClick = (e: React.MouseEvent<HTMLInputElement>) => {
+    if (!isSegmentMode) return;
+    
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const percentage = clickX / rect.width;
+    const time = percentage * duration;
+    
+    if (segmentMarkers.start === null) {
+      // 设置起始点
+      setSegmentMarkers({ start: time, end: null });
+    } else if (segmentMarkers.end === null) {
+      // 设置结束点
+      if (time > segmentMarkers.start) {
+        setSegmentMarkers({ ...segmentMarkers, end: time });
+      } else {
+        alert('结束点必须大于起始点');
+      }
+    } else {
+      // 重新设置起始点
+      setSegmentMarkers({ start: time, end: null });
+    }
+  };
+
+  const handleCutVideo = async () => {
+    if (!segmentMarkers.start || !segmentMarkers.end || !videoUrl) {
+      alert('请先设置起始和结束点');
+      return;
+    }
+
+    try {
+      setIsCuttingVideo(true);
+      
+      const { cutVideoSegment } = await import('../utils/ffmpegCutter');
+      const timestamp = new Date().toISOString().replace(/:/g, '-').split('.')[0];
+      const filename = `segment_${timestamp}.mp4`;
+      
+      const blob = await cutVideoSegment(
+        videoUrl,
+        segmentMarkers.start,
+        segmentMarkers.end,
+        filename,
+        (progress) => {
+          console.log(`截取进度: ${progress}%`);
+        }
+      );
+      
+      // 下载文件
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+      
+      setIsCuttingVideo(false);
+      setIsSegmentMode(false);
+      setSegmentMarkers({ start: null, end: null });
+      alert('视频片段截取完成！');
+    } catch (error) {
+      console.error('视频截取失败:', error);
+      alert(`视频截取失败: ${error}`);
+      setIsCuttingVideo(false);
+    }
   };
 
   const handleMouseMove = () => {
@@ -907,11 +976,14 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
                   max={duration || 0}
                   value={currentTime}
                   onChange={handleSeek}
+                  onClick={handleProgressClick}
                   className="w-full h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer slider"
                   style={{
                     background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${(currentTime / duration) * 100}%, #4b5563 ${(currentTime / duration) * 100}%, #4b5563 100%)`
                   }}
                 />
+                
+                {/* 涂鸦标记点 */}
                 {videoId && annotations.filter(a => a.video_url === videoId).map(annotation => (
                   <button
                     key={annotation.id}
@@ -925,6 +997,39 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
                     <BookmarkIcon size={12} className="absolute inset-0 m-auto text-gray-900" fill="currentColor" />
                   </button>
                 ))}
+                
+                {/* 片段起始标记 */}
+                {segmentMarkers.start !== null && (
+                  <div
+                    className="absolute top-0 w-4 h-4 bg-green-500 rounded-full transform -translate-x-1/2 -translate-y-1 shadow-lg border-2 border-white"
+                    style={{
+                      left: `${(segmentMarkers.start / duration) * 100}%`
+                    }}
+                    title={`起始: ${formatTime(segmentMarkers.start)}`}
+                  />
+                )}
+                
+                {/* 片段结束标记 */}
+                {segmentMarkers.end !== null && (
+                  <div
+                    className="absolute top-0 w-4 h-4 bg-red-500 rounded-full transform -translate-x-1/2 -translate-y-1 shadow-lg border-2 border-white"
+                    style={{
+                      left: `${(segmentMarkers.end / duration) * 100}%`
+                    }}
+                    title={`结束: ${formatTime(segmentMarkers.end)}`}
+                  />
+                )}
+                
+                {/* 片段范围高亮 */}
+                {segmentMarkers.start !== null && segmentMarkers.end !== null && (
+                  <div
+                    className="absolute top-0 h-1 bg-purple-500 opacity-50 pointer-events-none"
+                    style={{
+                      left: `${(segmentMarkers.start / duration) * 100}%`,
+                      width: `${((segmentMarkers.end - segmentMarkers.start) / duration) * 100}%`
+                    }}
+                  />
+                )}
               </div>
 
               <div className="flex items-center justify-between mt-3">
@@ -993,6 +1098,34 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
                 </div>
 
                 <div className="flex items-center gap-3">
+                  {/* 片段截取按钮（标记模式） */}
+                  {isSegmentMode && (
+                    <>
+                      <button
+                        onClick={handleCutVideo}
+                        disabled={!segmentMarkers.start || !segmentMarkers.end || isCuttingVideo}
+                        className={`flex items-center gap-2 px-3 py-1 rounded transition ${
+                          segmentMarkers.start && segmentMarkers.end && !isCuttingVideo
+                            ? 'bg-green-600 hover:bg-green-500 text-white'
+                            : 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                        }`}
+                        title="截取片段"
+                      >
+                        <span className="text-sm">{isCuttingVideo ? '截取中...' : '✂️ 截取'}</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setIsSegmentMode(false);
+                          setSegmentMarkers({ start: null, end: null });
+                        }}
+                        className="flex items-center gap-2 px-3 py-1 bg-gray-600 hover:bg-gray-500 text-white rounded transition"
+                        title="取消标记"
+                      >
+                        <span className="text-sm">取消</span>
+                      </button>
+                    </>
+                  )}
+                  
                   <button
                     onClick={openDrawingCanvas}
                     disabled={isPlaying}
@@ -1123,15 +1256,6 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
           </div>
         </div>
       )}
-      
-      {/* 片段下载对话框 */}
-      <ManualSegmentDialog
-        isOpen={showSegmentDialog}
-        onClose={() => setShowSegmentDialog(false)}
-        currentTime={currentTime}
-        duration={duration}
-        onDownload={handleSegmentDownload}
-      />
     </div>
   );
 };
