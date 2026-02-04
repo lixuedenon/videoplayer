@@ -2,7 +2,6 @@ import { VideoFile } from '../types/video';
 import { Annotation, DrawingData } from '../types/annotation';
 import { VideoSegmentSettings, VideoSegment } from '../types/videoSegment';
 import * as indexedDB from './indexedDB';
-import { saveScreenshot, deleteFile, getFileURL } from './localFileStorage';
 
 const PLAYER_STATE_KEY = 'player_state';
 const VIDEO_PROGRESS_KEY = 'video_progress';
@@ -112,8 +111,8 @@ export const saveAnnotation = async (
       timestamp,
       drawing_data: drawingData,
       thumbnail,
-      name: name || null,
-      text_content: textContent || null,
+      name: name || undefined,
+      text_content: textContent || undefined,
       live_drawing_data: liveDrawingData || null,
       is_live: !!liveDrawingData
     });

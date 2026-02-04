@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { SYMBOL_CATEGORIES, SymbolItem } from '../constants/symbols';
 import { ChevronDown } from 'lucide-react';
 

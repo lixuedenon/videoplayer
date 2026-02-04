@@ -176,7 +176,7 @@ export const Playlist: React.FC<PlaylistProps> = ({
                   >
                     <div className="flex items-start gap-3">
                       {/* 标注标记放在最前面 */}
-                      {videoAnnotationCounts && videoAnnotationCounts.get(video.url || video.path) > 0 && (
+                      {videoAnnotationCounts && videoAnnotationCounts.get(video.url || video.path) && videoAnnotationCounts.get(video.url || video.path)! > 0 && (
                         <div className="flex items-center gap-1 bg-green-600 text-white px-2 py-0.5 rounded-full text-xs flex-shrink-0 mt-1" title={`${videoAnnotationCounts.get(video.url || video.path)} 个涂鸦`}>
                           <Pencil size={10} />
                           <span>{videoAnnotationCounts.get(video.url || video.path)}</span>
@@ -212,7 +212,7 @@ export const Playlist: React.FC<PlaylistProps> = ({
                           {video.name}
                         </p>
                         {!video.file && !video.url && (
-                          <AlertCircle size={14} className="text-yellow-500 flex-shrink-0" title="文件不可用 - 页面已刷新" />
+                          <AlertCircle size={14} className="text-yellow-500 flex-shrink-0" />
                         )}
                       </div>
 

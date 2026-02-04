@@ -62,10 +62,10 @@ export async function globalSearch(
 
     if (nameMatches && durationMatches && countMatches) {
       // 生成视频缩略图(从第30-100帧随机选择)
-      let thumbnail: string | undefined = undefined;
+      let thumbnail: string | undefined;
       try {
         if (video.file || video.url) {
-          thumbnail = await generateVideoThumbnail(video);
+          thumbnail = (await generateVideoThumbnail(video)) || undefined;
         }
       } catch (error) {
         console.error('Failed to generate thumbnail for video:', video.name, error);

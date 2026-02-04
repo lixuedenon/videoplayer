@@ -23,8 +23,7 @@ import {
   createVideoUrl,
   isFileSystemAccessSupported,
   saveDirectoryHandle,
-  getDirectoryHandle,
-  verifyPermission
+  getDirectoryHandle
 } from './utils/fileSystem';
 import {
   getPlayerState,
@@ -297,7 +296,7 @@ function App() {
       if (dirHandle && isFileSystemAccessSupported()) {
         try {
           console.log('Attempting silent permission restoration...');
-          const permissionStatus = await dirHandle.requestPermission({ mode: 'read' });
+          const permissionStatus = await (dirHandle as any).requestPermission?.({ mode: 'read' });
           console.log('Permission status after request:', permissionStatus);
 
           if (permissionStatus === 'granted') {
@@ -740,32 +739,32 @@ function App() {
     }
   }, []);
 
-  const handleSearchSelect = useCallback(async (videoName: string, timestamp?: number) => {
-    const videoIndex = videos.findIndex(v => v.name === videoName);
-
-    if (videoIndex === -1) return;
-
-    if (videoIndex !== currentIndex) {
-      setCurrentIndex(videoIndex);
-      await savePlayerState(videoIndex);
-      setShouldAutoPlay(true);
-    }
-
-    if (timestamp !== undefined) {
-      setTimeout(() => {
-        const video = videoPlayerRef.current;
-        if (video) {
-          video.currentTime = timestamp;
-          video.play();
-        }
-      }, 500);
-    } else {
-      const video = videoPlayerRef.current;
-      if (video) {
-        video.play();
-      }
-    }
-  }, [videos, currentIndex]);
+  // const handleSearchSelect = useCallback(async (videoName: string, timestamp?: number) => {
+  //   const videoIndex = videos.findIndex(v => v.name === videoName);
+  //
+  //   if (videoIndex === -1) return;
+  //
+  //   if (videoIndex !== currentIndex) {
+  //     setCurrentIndex(videoIndex);
+  //     await savePlayerState(videoIndex);
+  //     setShouldAutoPlay(true);
+  //   }
+  //
+  //   if (timestamp !== undefined) {
+  //     setTimeout(() => {
+  //       const video = videoPlayerRef.current;
+  //       if (video) {
+  //         video.currentTime = timestamp;
+  //         video.play();
+  //       }
+  //     }, 500);
+  //   } else {
+  //     const video = videoPlayerRef.current;
+  //     if (video) {
+  //       video.play();
+  //     }
+  //   }
+  // }, [videos, currentIndex]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -1073,13 +1072,11 @@ function App() {
               buttonDisplayData={videoPlayerButtonData}
               onButtonClick={handleButtonClick}
               videos={videos}
-              onSelectResult={handleSearchSelect}
               onAnnotationChange={loadAnnotationCounts}
               activePanel={activePanel}
               onSetActivePanel={setActivePanel}
               isSearchPanelOpen={isGlobalSearchOpen}
               onCloseSearchPanel={handleCloseGlobalSearch}
-              recordingMode={recordingMode}
               includeMicrophone={includeMicrophone}
               replayBufferBefore={replayBufferBefore}
               replayBufferAfter={replayBufferAfter}

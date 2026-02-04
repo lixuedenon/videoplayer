@@ -1,11 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Trash2, Download, Clock, Video, Search, X } from 'lucide-react';
 import type { Annotation } from '../types/annotation';
 import type { VideoSegmentSettings } from '../types/videoSegment';
 import type { VideoFile } from '../types/video';
 import { downloadVideoSegment } from '../utils/videoSegmentDownload';
 import { getFileURL } from '../utils/localFileStorage';
-import { searchVideoSegments } from '../utils/search';
 import { searchAnnotations } from '../utils/database';
 
 interface SearchResult {
@@ -26,9 +25,6 @@ interface AnnotationsListProps {
   videoElement: HTMLVideoElement | null;
   videoSegmentSettings: VideoSegmentSettings;
   videos: VideoFile[];
-  onSelectResult: (videoName: string, timestamp?: number) => void;
-  isActive?: boolean;
-  onFocus?: () => void;
 }
 
 const ThumbnailImage: React.FC<{ thumbnail: string; alt: string }> = ({ thumbnail, alt }) => {
@@ -79,10 +75,7 @@ export const AnnotationsList: React.FC<AnnotationsListProps> = ({
   onDelete,
   videoElement,
   videoSegmentSettings,
-  videos,
-  onSelectResult,
-  isActive = true,
-  onFocus
+  videos
 }) => {
   const [downloadingIds, setDownloadingIds] = useState<Set<string>>(new Set());
   const [downloadAbortControllers] = useState<Map<string, () => void>>(new Map());
@@ -202,18 +195,18 @@ export const AnnotationsList: React.FC<AnnotationsListProps> = ({
     setIsSearchMode(false);
   };
 
-  const getResultIcon = (type: string) => {
-    switch (type) {
-      case 'video':
-        return '🎥';
-      case 'segment':
-        return '✂️';
-      case 'annotation':
-        return '✏️';
-      default:
-        return '📄';
-    }
-  };
+  // const getResultIcon = (type: string) => {
+  //   switch (type) {
+  //     case 'video':
+  //       return '🎥';
+  //     case 'segment':
+  //       return '✂️';
+  //     case 'annotation':
+  //       return '✏️';
+  //     default:
+  //       return '📄';
+  //   }
+  // };
 
   const handleAnnotationClick = (annotation: Annotation) => {
     onSeek(annotation.timestamp, annotation.video_url);

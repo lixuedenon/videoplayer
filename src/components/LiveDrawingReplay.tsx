@@ -433,7 +433,6 @@ export const LiveDrawingReplay: React.FC<LiveDrawingReplayProps> = ({
       }
       case 'bracket': {
         const w = Math.abs(width);
-        const h = Math.abs(height);
         ctx.beginPath();
         ctx.moveTo(start.x + w * 0.2, start.y);
         ctx.lineTo(start.x, start.y);

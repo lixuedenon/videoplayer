@@ -13,13 +13,11 @@ import {
   Paintbrush,
   BookmarkIcon,
   Circle,
-  Square,
-  Mic,
-  MicOff
+  Square
 } from 'lucide-react';
 import { CustomizableButton } from './CustomizableButton';
 import { ButtonShape } from '../types/buttonCustomization';
-import { ScreenRecorder, RecordingMode } from '../utils/screenRecorder';
+import { ScreenRecorder } from '../utils/screenRecorder';
 import { DrawingCanvas } from './DrawingCanvas';
 import { LiveDrawingOverlay } from './LiveDrawingOverlay';
 import { LiveDrawingReplay } from './LiveDrawingReplay';
@@ -29,7 +27,6 @@ import { saveAnnotation, getAnnotations, deleteAnnotation } from '../utils/datab
 import { VideoSegmentSettings } from '../types/videoSegment';
 import { VideoFile } from '../types/video';
 import { extractTextFromDrawingData } from '../utils/videoSegmentDownload';
-import { captureScreenshotWithDrawing } from '../utils/screenshot';
 import { saveScreenshot, checkFileSystemSupport } from '../utils/localFileStorage';
 
 interface VideoPlayerProps {
@@ -54,7 +51,6 @@ interface VideoPlayerProps {
   };
   onButtonClick?: (buttonName: 'play' | 'forward' | 'backward') => void;
   videos?: VideoFile[];
-  onSelectResult?: (videoName: string, timestamp?: number) => void;
   onAnnotationChange?: () => void;
   activePanel?: 'search' | 'annotations' | null;
   onSetActivePanel?: (panel: 'search' | 'annotations' | null) => void;
@@ -62,7 +58,6 @@ interface VideoPlayerProps {
   isSearchPanelOpen?: boolean;
   onCloseSearchPanel?: () => void;
   // 录制设置props
-  recordingMode: RecordingMode;
   includeMicrophone: boolean;
   // 回放设置props
   replayBufferBefore: number;
@@ -92,14 +87,12 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
   },
   onButtonClick,
   videos = [],
-  onSelectResult,
   onAnnotationChange,
   activePanel = null,
   onSetActivePanel,
   isSeekFromAnnotation = false,
   isSearchPanelOpen = false,
   onCloseSearchPanel,
-  recordingMode,
   includeMicrophone,
   replayBufferBefore,
   replayBufferAfter,
@@ -510,7 +503,7 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
     }
 
     try {
-      const result = await saveAnnotation(
+      await saveAnnotation(
         videoId,
         data.startTimestamp,
         drawingData,
@@ -710,20 +703,20 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const handleSegmentDownload = async (startTime: number, endTime: number) => {
-    if (!videoRef.current) return;
-    
-    const { downloadVideoSegment } = await import('../utils/videoSegmentDownload');
-    const timestamp = new Date().toISOString().replace(/:/g, '-').split('.')[0];
-    const filename = `segment_${timestamp}.webm`;
-    
-    await downloadVideoSegment(
-      videoRef.current,
-      startTime,
-      endTime,
-      filename
-    );
-  };
+  // const handleSegmentDownload = async (startTime: number, endTime: number) => {
+  //   if (!videoRef.current) return;
+  //
+  //   const { downloadVideoSegment } = await import('../utils/videoSegmentDownload');
+  //   const timestamp = new Date().toISOString().replace(/:/g, '-').split('.')[0];
+  //   const filename = `segment_${timestamp}.webm`;
+  //
+  //   await downloadVideoSegment(
+  //     videoRef.current,
+  //     startTime,
+  //     endTime,
+  //     filename
+  //   );
+  // };
 
   const handleProgressClick = (e: React.MouseEvent<HTMLInputElement>) => {
     if (!isSegmentMode) return;
@@ -1255,9 +1248,6 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
                 videoElement={videoRef.current}
                 videoSegmentSettings={videoSegmentSettings}
                 videos={videos}
-                onSelectResult={onSelectResult || (() => {})}
-                isActive={activePanel === 'annotations'}
-                onFocus={() => onSetActivePanel?.('annotations')}
               />
             </div>
           </div>

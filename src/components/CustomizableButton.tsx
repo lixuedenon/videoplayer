@@ -23,7 +23,6 @@ export const CustomizableButton: React.FC<CustomizableButtonProps> = ({
   onClick,
   disabled = false,
   className = '',
-  children,
   size = 24,
   title
 }) => {

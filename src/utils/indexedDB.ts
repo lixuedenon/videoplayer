@@ -228,7 +228,7 @@ export async function getVideoSegments(videoUrl?: string): Promise<VideoSegment[
 
     request.onsuccess = () => {
       const results = request.result as VideoSegment[];
-      results.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      results.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
       resolve(results);
     };
 

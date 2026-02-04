@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Paintbrush, Eraser, Trash2, Undo, Square, Save, Type, MousePointer } from 'lucide-react';
+import { Eraser, Trash2, Undo, Square, Save, Type, MousePointer } from 'lucide-react';
 import { CompactSymbolPicker } from './CompactSymbolPicker';
 import { ColorPicker } from './ColorPicker';
 import { ShapeSymbolPicker } from './ShapeSymbolPicker';
@@ -1089,7 +1089,6 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
       }
       case 'bracket': {
         const w = Math.abs(width);
-        const h = Math.abs(height);
         ctx.beginPath();
         ctx.moveTo(start.x + w * 0.2, start.y);
         ctx.lineTo(start.x, start.y);

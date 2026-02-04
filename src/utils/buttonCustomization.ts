@@ -6,7 +6,7 @@ import {
   ToggleMode,
   ButtonShape
 } from '../types/buttonCustomization';
-import { loadImage, saveImage, deleteImage, clearImages, getAllImagesByButton } from './fileSystem';
+import { saveImage, deleteImage, clearImages, getAllImagesByButton } from './fileSystem';
 
 const SETTINGS_KEY = 'button_settings';
 const STATES_KEY = 'button_states';

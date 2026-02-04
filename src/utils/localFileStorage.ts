@@ -1,4 +1,3 @@
-const DIRECTORY_HANDLE_KEY = 'video_annotation_directory_handle';
 const PERMISSION_GRANTED_KEY = 'directory_permission_granted';
 
 let cachedDirectoryHandle: FileSystemDirectoryHandle | null = null;
@@ -15,14 +14,13 @@ export async function requestDirectoryAccess(): Promise<FileSystemDirectoryHandl
 
   try {
     const dirHandle = await window.showDirectoryPicker({
-      mode: 'readwrite',
-      startIn: 'downloads'
+      mode: 'readwrite'
     });
 
     cachedDirectoryHandle = dirHandle;
 
     try {
-      const permissionStatus = await dirHandle.requestPermission({ mode: 'readwrite' });
+      const permissionStatus = await (dirHandle as any).requestPermission?.({ mode: 'readwrite' });
       if (permissionStatus === 'granted') {
         localStorage.setItem(PERMISSION_GRANTED_KEY, 'true');
       }

@@ -11,7 +11,7 @@ let isLoaded = false;
 /**
  * 加载FFmpeg实例（首次使用需要下载32MB文件）
  */
-async function loadFFmpeg(onProgress?: (progress: number) => void): Promise<FFmpeg> {
+async function loadFFmpeg(_onProgress?: (progress: number) => void): Promise<FFmpeg> {
   if (ffmpegInstance && isLoaded) {
     return ffmpegInstance;
   }

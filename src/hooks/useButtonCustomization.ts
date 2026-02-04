@@ -3,9 +3,7 @@ import {
   ButtonName,
   ButtonSettings,
   ButtonImage,
-  ButtonState,
-  ToggleMode,
-  ButtonShape
+  ButtonState
 } from '../types/buttonCustomization';
 import {
   getButtonSettings,

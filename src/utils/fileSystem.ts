@@ -90,11 +90,11 @@ export const getDirectoryHandle = async (): Promise<FileSystemDirectoryHandle | 
 export const verifyPermission = async (handle: FileSystemDirectoryHandle): Promise<boolean> => {
   const options = { mode: 'read' as FileSystemPermissionMode };
 
-  if ((await handle.queryPermission(options)) === 'granted') {
+  if ((await (handle as any).queryPermission?.(options)) === 'granted') {
     return true;
   }
 
-  if ((await handle.requestPermission(options)) === 'granted') {
+  if ((await (handle as any).requestPermission?.(options)) === 'granted') {
     return true;
   }
 

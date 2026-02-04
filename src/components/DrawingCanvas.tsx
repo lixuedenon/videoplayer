@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Pencil, Eraser, ArrowRight, Circle, Square, Undo, Redo, Trash2, Save, X, MousePointer, Minus, Highlighter, Check, XIcon, Camera, Clock, Video, Type } from 'lucide-react';
+import { Pencil, Eraser, ArrowRight, Circle, Square, Undo, Redo, Trash2, Save, X, MousePointer, Minus, Highlighter, Check, XIcon, Camera, Clock, Type } from 'lucide-react';
 import type { DrawingTool, DrawingElement, Point, DrawingStroke, ShapeAnnotation, TextAnnotation, DrawingData } from '../types/annotation';
 import { NameInputDialog } from './NameInputDialog';
 import { downloadVideoSegment, extractTextFromDrawingData } from '../utils/videoSegmentDownload';
