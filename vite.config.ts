@@ -6,6 +6,7 @@ export default defineConfig({
   plugins: [react()],
   optimizeDeps: {
     exclude: ['lucide-react'],
+    include: ['@ffmpeg/ffmpeg', '@ffmpeg/util']
   },
   server: {
     headers: {
@@ -14,6 +15,7 @@ export default defineConfig({
     },
   },
   build: {
+    target: 'esnext',
     rollupOptions: {
       output: {
         manualChunks: {
