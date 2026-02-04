@@ -755,7 +755,7 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
             </div>
           )}
 
-          {/* 录制按钮 - 始终显示 */}
+          {/* 录制按钮 - 始终显示（右上角第一个位置）*/}
           <div className="absolute top-4 right-4 z-20">
             <button
               onClick={(e) => {
@@ -784,8 +784,9 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
             </button>
           </div>
 
+          {/* 实时涂鸦按钮 - 录制按钮下方 */}
           {!showDrawingCanvas && (
-            <div className="absolute top-4 right-4 z-20">
+            <div className="absolute top-20 right-4 z-20">
               <button
                 onClick={(e) => {
                   e.stopPropagation();
