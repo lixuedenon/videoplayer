@@ -11,7 +11,7 @@ let isLoaded = false;
 /**
  * 加载FFmpeg实例（首次使用需要下载32MB文件）
  */
-async function loadFFmpeg(_onProgress?: (progress: number) => void): Promise<FFmpeg> {
+async function loadFFmpeg(onProgress?: (progress: number) => void): Promise<FFmpeg> {
   if (ffmpegInstance && isLoaded) {
     return ffmpegInstance;
   }
@@ -34,8 +34,8 @@ async function loadFFmpeg(_onProgress?: (progress: number) => void): Promise<FFm
       console.log('[FFmpeg]', message);
     });
 
-    // 加载FFmpeg核心文件（使用CDN）
-    const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
+    // 加载FFmpeg核心文件（使用jsdelivr CDN - 国内可访问）
+    const baseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd';
     await ffmpeg.load({
       coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
       wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
