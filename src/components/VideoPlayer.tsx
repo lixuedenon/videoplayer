@@ -24,6 +24,7 @@ import { DrawingCanvas } from './DrawingCanvas';
 import { LiveDrawingOverlay } from './LiveDrawingOverlay';
 import { LiveDrawingReplay } from './LiveDrawingReplay';
 import { AnnotationsList } from './AnnotationsList';
+import { ManualSegmentDialog } from './ManualSegmentDialog';
 import { Annotation, DrawingData } from '../types/annotation';
 import { saveAnnotation, getAnnotations, deleteAnnotation } from '../utils/database';
 import { VideoSegmentSettings } from '../types/videoSegment';
@@ -128,7 +129,8 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
   const [showAnnotationsList, setShowAnnotationsList] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
-  const [selectedRecordingMode, setSelectedRecordingMode] = useState<'drawing' | 'video' | 'screen'>('drawing');
+  const [selectedRecordingMode, setSelectedRecordingMode] = useState<'drawing' | 'segment' | 'screen'>('drawing');
+  const [showSegmentDialog, setShowSegmentDialog] = useState(false);
   const recorderRef = useRef<ScreenRecorder>(new ScreenRecorder());
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
   const seekTargetEndTime = useRef<number | null>(null);
@@ -593,6 +595,12 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
 
   const startRecording = async () => {
     try {
+      // 如果选择的是片段下载，打开对话框而不是录制
+      if (selectedRecordingMode === 'segment') {
+        setShowSegmentDialog(true);
+        return;
+      }
+      
       let canvas = document.querySelector('canvas') as HTMLCanvasElement | null;
       let actualMode: 'player' | 'screen' = 'screen';
       
@@ -611,14 +619,6 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
           alert('无法获取涂鸦Canvas，请稍后重试');
           return;
         }
-      } else if (selectedRecordingMode === 'video') {
-        // 录制纯视频：使用player模式但不需要canvas
-        actualMode = 'player';
-        canvas = null;
-      } else if (selectedRecordingMode === 'screen') {
-        // 录制屏幕：使用screen模式
-        actualMode = 'screen';
-        canvas = null;
       }
 
       if (!includeMicrophone) {
@@ -707,6 +707,21 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const handleSegmentDownload = async (startTime: number, endTime: number) => {
+    if (!videoRef.current) return;
+    
+    const { downloadVideoSegment } = await import('../utils/videoSegmentDownload');
+    const timestamp = new Date().toISOString().replace(/:/g, '-').split('.')[0];
+    const filename = `segment_${timestamp}.webm`;
+    
+    await downloadVideoSegment(
+      videoRef.current,
+      startTime,
+      endTime,
+      filename
+    );
+  };
+
   const handleMouseMove = () => {
     setShowControls(true);
     if (hideControlsTimer.current) {
@@ -779,12 +794,12 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
                 {/* 录制模式选择下拉菜单 */}
                 <select
                   value={selectedRecordingMode}
-                  onChange={(e) => setSelectedRecordingMode(e.target.value as 'drawing' | 'video' | 'screen')}
+                  onChange={(e) => setSelectedRecordingMode(e.target.value as 'drawing' | 'segment' | 'screen')}
                   className="px-3 py-2 bg-gray-700 text-white rounded-lg text-sm font-medium border border-gray-600 focus:outline-none focus:border-blue-500 cursor-pointer"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <option value="drawing">🔴 录制涂鸦</option>
-                  <option value="video">📹 录制纯视频</option>
+                  <option value="segment">✂️ 截取片段</option>
                   <option value="screen">🖥️ 录制屏幕</option>
                 </select>
                 
@@ -1108,6 +1123,15 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
           </div>
         </div>
       )}
+      
+      {/* 片段下载对话框 */}
+      <ManualSegmentDialog
+        isOpen={showSegmentDialog}
+        onClose={() => setShowSegmentDialog(false)}
+        currentTime={currentTime}
+        duration={duration}
+        onDownload={handleSegmentDownload}
+      />
     </div>
   );
 };
