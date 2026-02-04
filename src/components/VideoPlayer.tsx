@@ -128,6 +128,7 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
   const [showAnnotationsList, setShowAnnotationsList] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
+  const [selectedRecordingMode, setSelectedRecordingMode] = useState<'drawing' | 'video' | 'screen'>('drawing');
   const recorderRef = useRef<ScreenRecorder>(new ScreenRecorder());
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
   const seekTargetEndTime = useRef<number | null>(null);
@@ -592,21 +593,37 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
 
   const startRecording = async () => {
     try {
-      const canvas = document.querySelector('canvas') as HTMLCanvasElement | null;
+      let canvas = document.querySelector('canvas') as HTMLCanvasElement | null;
+      let actualMode: 'player' | 'screen' = 'screen';
       
-      if (recordingMode === 'player' && !canvas) {
-        const continueWithoutCanvas = confirm(
-          '当前没有涂鸦标注。是否继续录制（仅录制视频画面）？\n\n' +
-          '提示：如果要录制涂鸦，请先点击"涂鸦标注"按钮添加标注。'
-        );
-        if (!continueWithoutCanvas) {
+      // 根据选择的模式处理
+      if (selectedRecordingMode === 'drawing') {
+        // 录制涂鸦：自动开启实时涂鸦
+        if (!showLiveDrawing) {
+          setShowLiveDrawing(true);
+          // 等待实时涂鸦Canvas创建
+          await new Promise(resolve => setTimeout(resolve, 500));
+          canvas = document.querySelector('canvas') as HTMLCanvasElement | null;
+        }
+        actualMode = 'player';
+        
+        if (!canvas) {
+          alert('无法获取涂鸦Canvas，请稍后重试');
           return;
         }
+      } else if (selectedRecordingMode === 'video') {
+        // 录制纯视频：使用player模式但不需要canvas
+        actualMode = 'player';
+        canvas = null;
+      } else if (selectedRecordingMode === 'screen') {
+        // 录制屏幕：使用screen模式
+        actualMode = 'screen';
+        canvas = null;
       }
 
       if (!includeMicrophone) {
         await recorderRef.current.startRecording({
-          mode: recordingMode,
+          mode: actualMode,
           includeMicrophone: false,
           videoElement: videoRef.current,
           canvasElement: canvas
@@ -623,7 +640,7 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
 
       try {
         await recorderRef.current.startRecording({
-          mode: recordingMode,
+          mode: actualMode,
           includeMicrophone: true,
           videoElement: videoRef.current,
           canvasElement: canvas
@@ -640,7 +657,7 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
           const continueWithoutMic = confirm('麦克风权限被拒绝。是否继续录制（不包含麦克风音频）？');
           if (continueWithoutMic) {
             await recorderRef.current.startRecording({
-              mode: recordingMode,
+              mode: actualMode,
               includeMicrophone: false,
               videoElement: videoRef.current,
               canvasElement: canvas
@@ -755,38 +772,54 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
             </div>
           )}
 
-          {/* 录制按钮 - 始终显示（右上角第一个位置）*/}
-          <div className="absolute top-4 right-4 z-20">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                if (isRecording) {
+          {/* 录制按钮组 - 下拉菜单 */}
+          <div className="absolute top-4 right-4 z-50 flex gap-2">
+            {!isRecording ? (
+              <>
+                {/* 录制模式选择下拉菜单 */}
+                <select
+                  value={selectedRecordingMode}
+                  onChange={(e) => setSelectedRecordingMode(e.target.value as 'drawing' | 'video' | 'screen')}
+                  className="px-3 py-2 bg-gray-700 text-white rounded-lg text-sm font-medium border border-gray-600 focus:outline-none focus:border-blue-500 cursor-pointer"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <option value="drawing">🔴 录制涂鸦</option>
+                  <option value="video">📹 录制纯视频</option>
+                  <option value="screen">🖥️ 录制屏幕</option>
+                </select>
+                
+                {/* 开始录制按钮 */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    startRecording();
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg shadow-lg transition-all hover:scale-105 font-medium"
+                  title="开始录制"
+                >
+                  <Circle size={20} />
+                  <span>开始</span>
+                </button>
+              </>
+            ) : (
+              /* 录制中显示停止按钮 */
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
                   stopRecording();
-                } else {
-                  startRecording();
-                }
-              }}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg shadow-lg transition-all hover:scale-105 ${
-                isRecording 
-                  ? 'bg-red-600 hover:bg-red-500 animate-pulse' 
-                  : 'bg-green-600 hover:bg-green-500'
-              } text-white`}
-              title={
-                isRecording 
-                  ? '停止录制' 
-                  : `开始录制 (${recordingMode === 'player' ? '播放器+涂鸦' : '屏幕录制'})`
-              }
-            >
-              {isRecording ? <Square size={20} /> : <Circle size={20} />}
-              <span className="font-medium">
-                {isRecording ? `录制中 ${formatRecordingTime(recordingTime)}` : '录制'}
-              </span>
-            </button>
+                }}
+                className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg shadow-lg transition-all hover:scale-105 animate-pulse font-medium"
+                title="停止录制"
+              >
+                <Square size={20} />
+                <span>录制中 {formatRecordingTime(recordingTime)}</span>
+              </button>
+            )}
           </div>
 
           {/* 实时涂鸦按钮 - 录制按钮下方 */}
           {!showDrawingCanvas && (
-            <div className="absolute top-20 right-4 z-20">
+            <div className="absolute top-20 right-4 z-40">
               <button
                 onClick={(e) => {
                   e.stopPropagation();
