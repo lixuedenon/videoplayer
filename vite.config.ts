@@ -4,6 +4,9 @@ import react from '@vitejs/plugin-react';
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    conditions: ['browser', 'default', 'import']
+  },
   optimizeDeps: {
     exclude: ['lucide-react'],
     include: ['@ffmpeg/ffmpeg', '@ffmpeg/util']
