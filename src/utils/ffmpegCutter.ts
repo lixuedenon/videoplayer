@@ -34,12 +34,11 @@ async function loadFFmpeg(onProgress?: (progress: number) => void): Promise<FFmp
       console.log('[FFmpeg]', message);
     });
 
-    // 加载FFmpeg核心文件（从本地public目录）
+    // 加载FFmpeg核心文件（从本地public目录 - 单线程版本）
     const baseURL = '/ffmpeg';
     await ffmpeg.load({
       coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
       wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
-      workerURL: await toBlobURL(`${baseURL}/ffmpeg-core.worker.js`, 'text/javascript'),
     });
 
     ffmpegInstance = ffmpeg;
