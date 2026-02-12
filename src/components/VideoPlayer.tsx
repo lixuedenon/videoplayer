@@ -18,7 +18,6 @@ import {
 import { CustomizableButton } from './CustomizableButton';
 import { ButtonShape } from '../types/buttonCustomization';
 import { ScreenRecorder } from '../utils/screenRecorder';
-import { DrawingCanvas } from './DrawingCanvas';
 import { LiveDrawingOverlay } from './LiveDrawingOverlay';
 import { LiveDrawingReplay } from './LiveDrawingReplay';
 import { AnnotationsList } from './AnnotationsList';
@@ -110,7 +109,6 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
   const hideControlsTimer = useRef<NodeJS.Timeout | null>(null);
   const previousVideoUrlRef = useRef<string>('');
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
-  const [showDrawingCanvas, setShowDrawingCanvas] = useState(false);
   const [showLiveDrawing, setShowLiveDrawing] = useState(false);
   const [showLivePlayback, setShowLivePlayback] = useState(false);
   const [currentPlaybackData, setCurrentPlaybackData] = useState<{
@@ -353,75 +351,6 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const handleSaveAnnotation = async (drawingData: DrawingData, thumbnail: string, name: string, saveType?: 'annotation' | 'screenshot' | 'video-segment' | 'timestamp') => {
-    if (!videoId || !videoRef.current) return;
-
-    const timestamp = videoRef.current.currentTime;
-    const videoName = videoId.split('/').pop() || 'video';
-
-    if (saveType === 'screenshot') {
-      console.log('Screenshot saved');
-      return;
-    }
-
-    if (saveType === 'timestamp') {
-      console.log('Timestamp saved:', timestamp);
-      return;
-    }
-
-    if (saveType === 'video-segment') {
-      console.log('Video segment save requested at:', timestamp);
-      alert(`视频段保存功能需要配置起始和结束时间点\n当前时间：${timestamp.toFixed(2)}秒`);
-      return;
-    }
-
-    const textContent = extractTextFromDrawingData(drawingData);
-
-    let filePath: string | null = null;
-    let finalThumbnail = thumbnail;
-
-    if (await checkFileSystemSupport()) {
-      try {
-        const canvas = document.createElement('canvas');
-        canvas.width = drawingData.canvasWidth;
-        canvas.height = drawingData.canvasHeight;
-        const ctx = canvas.getContext('2d');
-
-        if (ctx) {
-          const img = new Image();
-          img.src = thumbnail;
-          await new Promise((resolve) => {
-            img.onload = resolve;
-          });
-          ctx.drawImage(img, 0, 0);
-        }
-
-        const blob = await new Promise<Blob>((resolve) => {
-          canvas.toBlob((b) => resolve(b!), 'image/png', 1.0);
-        });
-
-        filePath = await saveScreenshot(videoName, timestamp, blob);
-
-        if (filePath) {
-          finalThumbnail = filePath;
-          console.log('Screenshot saved to local file system:', filePath);
-        }
-      } catch (error) {
-        console.error('Failed to save screenshot to file system, using base64:', error);
-      }
-    }
-
-    const annotation = await saveAnnotation(videoId, timestamp, drawingData, finalThumbnail, name, textContent);
-
-    if (annotation) {
-      const updatedAnnotations = await getAnnotations();
-      setAnnotations(updatedAnnotations);
-      setShowDrawingCanvas(false);
-      if (onAnnotationChange) {
-        onAnnotationChange();
-      }
-    }
-  };
 
   const handleSaveLiveDrawing = async (data: {
     strokes: any[];
@@ -578,13 +507,6 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
     }
 
     setShowAnnotationsList(false);
-  };
-
-  const openDrawingCanvas = () => {
-    if (!isPlaying && videoRef.current) {
-      videoRef.current.pause();
-      setShowDrawingCanvas(true);
-    }
   };
 
   const startRecording = async () => {
@@ -832,23 +754,6 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
             style={{ zIndex: 1 }}
           />
 
-          {/* 涂鸦标注按钮 - 只在暂停时显示 */}
-          {!isPlaying && (
-            <div className="absolute top-4 left-4 z-20">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  openDrawingCanvas();
-                }}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg shadow-lg transition-all hover:scale-105"
-                title="开始涂鸦标注"
-              >
-                <Paintbrush size={20} />
-                <span className="font-medium">涂鸦标注</span>
-              </button>
-            </div>
-          )}
-
           {/* 录制按钮组 - 下拉菜单 */}
           <div className="absolute top-4 right-4 z-50 flex gap-2">
             {!isRecording ? (
@@ -895,8 +800,7 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
           </div>
 
           {/* 实时涂鸦按钮 - 录制按钮下方 */}
-          {!showDrawingCanvas && (
-            <div className="absolute top-20 right-4 z-40">
+          <div className="absolute top-20 right-4 z-40">
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -936,8 +840,7 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
                   </span>
                 </button>
               )}
-            </div>
-          )}
+          </div>
 
           {error && (
             <div
@@ -1118,20 +1021,6 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
                       </button>
                     </>
                   )}
-                  
-                  <button
-                    onClick={openDrawingCanvas}
-                    disabled={isPlaying}
-                    className={`flex items-center gap-2 px-3 py-1 rounded transition ${
-                      isPlaying
-                        ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
-                        : 'bg-blue-600 hover:bg-blue-500 text-white'
-                    }`}
-                    title={isPlaying ? "暂停后可涂鸦" : "开始涂鸦"}
-                  >
-                    <Paintbrush size={18} />
-                    <span className="text-sm">涂鸦</span>
-                  </button>
 
                   <button
                     onClick={() => {
@@ -1196,16 +1085,6 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
             </p>
           </div>
         </div>
-      )}
-
-      {showDrawingCanvas && videoRef.current && videoUrl && (
-        <DrawingCanvas
-          videoElement={videoRef.current}
-          onSave={handleSaveAnnotation}
-          onClose={() => setShowDrawingCanvas(false)}
-          videoUrl={videoUrl}
-          videoName={videoUrl.split('/').pop() || 'video'}
-        />
       )}
 
       <LiveDrawingOverlay
