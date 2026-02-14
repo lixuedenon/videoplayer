@@ -27,6 +27,8 @@ import { VideoSegmentSettings } from '../types/videoSegment';
 import { VideoFile } from '../types/video';
 import { extractTextFromDrawingData } from '../utils/videoSegmentDownload';
 import { saveScreenshot, checkFileSystemSupport } from '../utils/localFileStorage';
+import { parseVideoUrl, supportsFullFeatures } from '../utils/videoUrlParser';
+import { EmbeddedVideoPlayer } from './EmbeddedVideoPlayer';
 
 interface VideoPlayerProps {
   videoUrl: string | null;
@@ -126,6 +128,9 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
   const recorderRef = useRef<ScreenRecorder>(new ScreenRecorder());
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
   const seekTargetEndTime = useRef<number | null>(null);
+
+  const parsedVideoUrl = videoUrl ? parseVideoUrl(videoUrl) : null;
+  const isEmbeddedVideo = parsedVideoUrl && !supportsFullFeatures(parsedVideoUrl.type);
 
   useEffect(() => {
     if (videoId) {
@@ -729,33 +734,43 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
     >
       {videoUrl ? (
         <>
-          <video
-            ref={videoRef}
-            className="w-full h-full"
-            onTimeUpdate={handleTimeUpdate}
-            onLoadedMetadata={handleLoadedMetadata}
-            onEnded={onEnded}
-            onPlay={() => {
-              setIsPlaying(true);
-              onPlayingStateChange?.(true);
-            }}
-            onPause={() => {
-              setIsPlaying(false);
-              onPlayingStateChange?.(false);
-            }}
-          />
+          {isEmbeddedVideo && parsedVideoUrl ? (
+            <EmbeddedVideoPlayer
+              parsedUrl={parsedVideoUrl}
+              onError={(error) => setError(error)}
+            />
+          ) : (
+            <video
+              ref={videoRef}
+              className="w-full h-full"
+              onTimeUpdate={handleTimeUpdate}
+              onLoadedMetadata={handleLoadedMetadata}
+              onEnded={onEnded}
+              onPlay={() => {
+                setIsPlaying(true);
+                onPlayingStateChange?.(true);
+              }}
+              onPause={() => {
+                setIsPlaying(false);
+                onPlayingStateChange?.(false);
+              }}
+            />
+          )}
 
-          <div
-            className="absolute inset-0 cursor-pointer"
-            onClick={() => {
-              togglePlay();
-              onTogglePlay?.();
-            }}
-            style={{ zIndex: 1 }}
-          />
+          {!isEmbeddedVideo && (
+            <div
+              className="absolute inset-0 cursor-pointer"
+              onClick={() => {
+                togglePlay();
+                onTogglePlay?.();
+              }}
+              style={{ zIndex: 1 }}
+            />
+          )}
 
-          {/* 录制按钮组 - 下拉菜单 */}
-          <div className="absolute top-4 right-4 z-50 flex gap-2">
+          {/* 录制按钮组 - 下拉菜单 - 仅直接视频可用 */}
+          {!isEmbeddedVideo && (
+            <div className="absolute top-4 right-4 z-50 flex gap-2">
             {!isRecording ? (
               <>
                 {/* 录制模式选择下拉菜单 */}
@@ -797,10 +812,12 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
                 <span>录制中 {formatRecordingTime(recordingTime)}</span>
               </button>
             )}
-          </div>
+            </div>
+          )}
 
-          {/* 实时涂鸦按钮 - 录制按钮下方 */}
-          <div className="absolute top-20 right-4 z-40">
+          {/* 实时涂鸦按钮 - 录制按钮下方 - 仅直接视频可用 */}
+          {!isEmbeddedVideo && (
+            <div className="absolute top-20 right-4 z-40">
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -840,7 +857,8 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
                   </span>
                 </button>
               )}
-          </div>
+            </div>
+          )}
 
           {error && (
             <div
@@ -857,13 +875,15 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
             </div>
           )}
 
-          <div
-            className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent transition-opacity duration-300 ${
-              showControls ? 'opacity-100' : 'opacity-0'
-            }`}
-            style={{ zIndex: 10 }}
-            onClick={(e) => e.stopPropagation()}
-          >
+          {/* 控制栏 - 仅直接视频可用 */}
+          {!isEmbeddedVideo && (
+            <div
+              className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent transition-opacity duration-300 ${
+                showControls ? 'opacity-100' : 'opacity-0'
+              }`}
+              style={{ zIndex: 10 }}
+              onClick={(e) => e.stopPropagation()}
+            >
             <div className="px-4 pb-4 pt-8">
               <div className="relative">
                 <input
@@ -1065,9 +1085,10 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
                 </div>
               </div>
             </div>
-          </div>
+            </div>
+          )}
 
-          {showLivePlayback && currentPlaybackData && videoRef.current && (
+          {!isEmbeddedVideo && showLivePlayback && currentPlaybackData && videoRef.current && (
             <LiveDrawingReplay
               videoElement={videoRef.current}
               liveDrawingData={currentPlaybackData.liveDrawingData}
@@ -1087,14 +1108,16 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
         </div>
       )}
 
-      <LiveDrawingOverlay
-        videoElement={videoRef.current}
-        isActive={showLiveDrawing}
-        onClose={() => setShowLiveDrawing(false)}
-        onSave={handleSaveLiveDrawing}
-      />
+      {!isEmbeddedVideo && (
+        <LiveDrawingOverlay
+          videoElement={videoRef.current}
+          isActive={showLiveDrawing}
+          onClose={() => setShowLiveDrawing(false)}
+          onSave={handleSaveLiveDrawing}
+        />
+      )}
 
-      {showAnnotationsList && (
+      {!isEmbeddedVideo && showAnnotationsList && (
         <div 
           className={`fixed top-[100px] right-0 w-[30%] max-h-[calc(100vh-100px)] overflow-hidden ${
             activePanel === 'annotations' ? 'z-50' : 'z-40'
