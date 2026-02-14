@@ -507,8 +507,16 @@ function App() {
     };
 
     const updatedVideos = [...videos, newVideo];
+    const newVideoIndex = updatedVideos.length - 1;
+
     setVideos(updatedVideos);
     await savePlaylist(updatedVideos);
+
+    // 自动切换到新添加的视频并播放
+    console.log('✨ Switching to newly added video at index:', newVideoIndex);
+    setCurrentIndex(newVideoIndex);
+    setShouldAutoPlay(true);
+    await savePlayerState(newVideoIndex);
   };
 
   const handleDeleteVideo = async (index: number) => {
