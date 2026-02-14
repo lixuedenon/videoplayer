@@ -247,22 +247,34 @@ function App() {
   }, [videos, loadAnnotationCounts]);
 
   useEffect(() => {
+    console.log('=== Video URL useEffect triggered ===');
+    console.log('currentIndex:', currentIndex, 'videos.length:', videos.length);
+
     if (videos.length > 0 && currentIndex >= 0 && currentIndex < videos.length) {
       const currentVideo = videos[currentIndex];
+      console.log('Current video:', {
+        name: currentVideo.name,
+        path: currentVideo.path,
+        url: currentVideo.url,
+        hasFile: !!currentVideo.file
+      });
 
       // 构建一个唯一标识符来判断是否是同一个视频
       const videoIdentifier = currentVideo.url || currentVideo.path;
+      console.log('Video identifier:', videoIdentifier);
+      console.log('Previous identifier:', currentVideoPathRef.current);
 
       // 如果是同一个视频，跳过
       if (currentVideoPathRef.current === videoIdentifier) {
-        console.log('Same video, skipping URL update:', videoIdentifier);
+        console.log('✓ Same video, skipping URL update');
         return;
       }
 
-      console.log('Video changed, from:', currentVideoPathRef.current, 'to:', videoIdentifier);
+      console.log('✗ Video changed, updating URL');
 
       // 清理旧的 blob URL
       if (currentVideoUrlRef.current && currentVideoUrlRef.current.startsWith('blob:')) {
+        console.log('Revoking old blob URL:', currentVideoUrlRef.current);
         URL.revokeObjectURL(currentVideoUrlRef.current);
       }
 
@@ -273,13 +285,17 @@ function App() {
       let newUrl: string | null = null;
       if (currentVideo.file) {
         newUrl = createVideoUrl(currentVideo.file);
+        console.log('Created blob URL for local file:', newUrl);
       } else if (currentVideo.url) {
         newUrl = currentVideo.url;
+        console.log('Using external URL:', newUrl);
       }
 
       currentVideoUrlRef.current = newUrl || '';
+      console.log('Setting currentVideoUrl to:', newUrl);
       setCurrentVideoUrl(newUrl);
     } else {
+      console.log('No videos or invalid index, clearing state');
       // 清理并重置
       if (currentVideoUrlRef.current && currentVideoUrlRef.current.startsWith('blob:')) {
         URL.revokeObjectURL(currentVideoUrlRef.current);
@@ -288,6 +304,7 @@ function App() {
       currentVideoUrlRef.current = '';
       setCurrentVideoUrl(null);
     }
+    console.log('=== End of useEffect ===\n');
   }, [currentIndex, videos]);
 
   const loadSavedState = async () => {
