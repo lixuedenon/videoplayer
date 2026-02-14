@@ -249,31 +249,32 @@ function App() {
     if (videos.length > 0 && currentIndex >= 0 && currentIndex < videos.length) {
       const currentVideo = videos[currentIndex];
 
-      if (currentVideoPathRef.current === currentVideo.path) {
-        console.log('Same video path, skipping URL creation:', currentVideo.path);
-        return;
-      }
-
-      console.log('Video path changed, creating new URL:', currentVideo.path);
-      currentVideoPathRef.current = currentVideo.path;
-
-      if (currentVideoUrl && currentVideoUrl.startsWith('blob:')) {
-        URL.revokeObjectURL(currentVideoUrl);
-      }
-
+      // 计算新的 URL
+      let newUrl: string | null = null;
       if (currentVideo.file) {
-        const newUrl = createVideoUrl(currentVideo.file);
-        setCurrentVideoUrl(newUrl);
+        newUrl = createVideoUrl(currentVideo.file);
       } else if (currentVideo.url) {
-        setCurrentVideoUrl(currentVideo.url);
-      } else {
-        setCurrentVideoUrl(null);
+        newUrl = currentVideo.url;
+      }
+
+      // 只有当 URL 真的改变时才更新
+      if (newUrl !== currentVideoPathRef.current) {
+        console.log('Video path changed, from:', currentVideoPathRef.current, 'to:', newUrl);
+
+        // 清理旧的 blob URL
+        if (currentVideoPathRef.current && currentVideoPathRef.current.startsWith('blob:')) {
+          URL.revokeObjectURL(currentVideoPathRef.current);
+        }
+
+        currentVideoPathRef.current = newUrl;
+        setCurrentVideoUrl(newUrl);
       }
     } else {
-      currentVideoPathRef.current = '';
-      if (currentVideoUrl && currentVideoUrl.startsWith('blob:')) {
-        URL.revokeObjectURL(currentVideoUrl);
+      // 清理并重置
+      if (currentVideoPathRef.current && currentVideoPathRef.current.startsWith('blob:')) {
+        URL.revokeObjectURL(currentVideoPathRef.current);
       }
+      currentVideoPathRef.current = '';
       setCurrentVideoUrl(null);
     }
   }, [currentIndex, videos]);
