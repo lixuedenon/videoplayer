@@ -72,6 +72,7 @@ function App() {
   const addFileInputRef = useRef<HTMLInputElement>(null);
   const [useFileSystemAccess, setUseFileSystemAccess] = useState(true);
   const currentVideoPathRef = useRef<string>('');
+  const currentVideoUrlRef = useRef<string>('');
 
   // 录制设置状态
   const [recordingMode, setRecordingMode] = useState<RecordingMode>('player');
@@ -249,7 +250,26 @@ function App() {
     if (videos.length > 0 && currentIndex >= 0 && currentIndex < videos.length) {
       const currentVideo = videos[currentIndex];
 
-      // 计算新的 URL
+      // 构建一个唯一标识符来判断是否是同一个视频
+      const videoIdentifier = currentVideo.url || currentVideo.path;
+
+      // 如果是同一个视频，跳过
+      if (currentVideoPathRef.current === videoIdentifier) {
+        console.log('Same video, skipping URL update:', videoIdentifier);
+        return;
+      }
+
+      console.log('Video changed, from:', currentVideoPathRef.current, 'to:', videoIdentifier);
+
+      // 清理旧的 blob URL
+      if (currentVideoUrlRef.current && currentVideoUrlRef.current.startsWith('blob:')) {
+        URL.revokeObjectURL(currentVideoUrlRef.current);
+      }
+
+      // 更新标识符
+      currentVideoPathRef.current = videoIdentifier;
+
+      // 创建新的 URL
       let newUrl: string | null = null;
       if (currentVideo.file) {
         newUrl = createVideoUrl(currentVideo.file);
@@ -257,24 +277,15 @@ function App() {
         newUrl = currentVideo.url;
       }
 
-      // 只有当 URL 真的改变时才更新
-      if (newUrl !== currentVideoPathRef.current) {
-        console.log('Video path changed, from:', currentVideoPathRef.current, 'to:', newUrl);
-
-        // 清理旧的 blob URL
-        if (currentVideoPathRef.current && currentVideoPathRef.current.startsWith('blob:')) {
-          URL.revokeObjectURL(currentVideoPathRef.current);
-        }
-
-        currentVideoPathRef.current = newUrl;
-        setCurrentVideoUrl(newUrl);
-      }
+      currentVideoUrlRef.current = newUrl || '';
+      setCurrentVideoUrl(newUrl);
     } else {
       // 清理并重置
-      if (currentVideoPathRef.current && currentVideoPathRef.current.startsWith('blob:')) {
-        URL.revokeObjectURL(currentVideoPathRef.current);
+      if (currentVideoUrlRef.current && currentVideoUrlRef.current.startsWith('blob:')) {
+        URL.revokeObjectURL(currentVideoUrlRef.current);
       }
       currentVideoPathRef.current = '';
+      currentVideoUrlRef.current = '';
       setCurrentVideoUrl(null);
     }
   }, [currentIndex, videos]);
