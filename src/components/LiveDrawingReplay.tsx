@@ -74,7 +74,8 @@ export const LiveDrawingReplay: React.FC<LiveDrawingReplayProps> = ({
       let drawnCount = 0;
       liveDrawingData.strokes.forEach((stroke, index) => {
         // 只绘制已经开始的笔画（使用相对时间比较）
-        if (relativeTime < stroke.startTime) return;
+        // 添加小容差以处理精度问题
+        if (relativeTime < (stroke.startTime - 0.01)) return;
         drawnCount++;
 
         // 详细日志第一个笔画
@@ -182,9 +183,15 @@ export const LiveDrawingReplay: React.FC<LiveDrawingReplayProps> = ({
       ctx.globalCompositeOperation = 'source-over';
 
       // 绘制调试信息：显示有多少笔画被绘制
-      ctx.font = '20px Arial';
+      ctx.font = '16px Arial';
       ctx.fillStyle = 'yellow';
-      ctx.fillText(`Drawing ${drawnCount} strokes`, 10, 30);
+      ctx.shadowColor = 'black';
+      ctx.shadowBlur = 2;
+      ctx.fillText(`Strokes: ${drawnCount}/${liveDrawingData.strokes.length}`, 10, 25);
+      ctx.fillText(`Video: ${currentVideoTime.toFixed(2)}s`, 10, 45);
+      ctx.fillText(`Relative: ${relativeTime.toFixed(2)}s`, 10, 65);
+      ctx.fillText(`Start: ${startTimestamp.toFixed(2)}s`, 10, 85);
+      ctx.shadowBlur = 0;
 
       // 继续下一帧
       animationFrameRef.current = requestAnimationFrame(renderFrame);
