@@ -481,6 +481,13 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
     seekTargetEndTime.current = endTime;
 
     if (is_live && live_drawing_data) {
+      console.log('[VideoPlayer] 启动涂鸦回放:', {
+        timestamp,
+        strokesCount: live_drawing_data.strokes?.length,
+        duration: live_drawing_data.duration,
+        canvasWidth: live_drawing_data.canvasWidth,
+        canvasHeight: live_drawing_data.canvasHeight
+      });
       playbackStartTimeRef.current = Date.now();
       setCurrentPlaybackData({
         liveDrawingData: live_drawing_data,

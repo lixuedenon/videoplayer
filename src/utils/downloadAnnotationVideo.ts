@@ -55,8 +55,10 @@ export async function downloadAnnotationVideo(
     hiddenVideo.style.height = '1px';
     hiddenVideo.style.opacity = '0';
     hiddenVideo.style.pointerEvents = 'none';
-    hiddenVideo.muted = true;
-    hiddenVideo.volume = 0;
+    hiddenVideo.crossOrigin = 'anonymous';
+    // 不要mute视频，这样可以保留声音
+    hiddenVideo.muted = false;
+    hiddenVideo.volume = 1;
 
     if (videoElement.src) {
       hiddenVideo.src = videoElement.src;
@@ -125,6 +127,16 @@ export async function downloadAnnotationVideo(
 
       // 如果有涂鸦数据，创建合成canvas
       if (hasDrawing && annotation.live_drawing_data) {
+        console.log('[DownloadVideo] 开始合成带涂鸦的视频:', {
+          startTime,
+          endTime,
+          duration: endTime - startTime,
+          videoWidth: hiddenVideo.videoWidth,
+          videoHeight: hiddenVideo.videoHeight,
+          annotationTimestamp: annotation.timestamp,
+          strokesCount: annotation.live_drawing_data.strokes?.length
+        });
+
         const compositeCanvas = document.createElement('canvas');
         compositeCanvas.width = hiddenVideo.videoWidth || 1280;
         compositeCanvas.height = hiddenVideo.videoHeight || 720;
@@ -140,9 +152,21 @@ export async function downloadAnnotationVideo(
         const drawingStartTime = annotation.timestamp;
 
         // 渲染合成帧的函数
+        let frameCount = 0;
         const renderCompositeFrame = () => {
           const currentVideoTime = hiddenVideo.currentTime;
           const relativeTime = currentVideoTime - drawingStartTime;
+
+          // 每30帧打印一次调试信息
+          if (frameCount % 30 === 0) {
+            console.log('[DownloadVideo] Rendering frame:', {
+              frameCount,
+              currentVideoTime: currentVideoTime.toFixed(2),
+              relativeTime: relativeTime.toFixed(2),
+              strokesCount: drawingData.strokes.length
+            });
+          }
+          frameCount++;
 
           // 清空画布
           ctx.clearRect(0, 0, compositeCanvas.width, compositeCanvas.height);
@@ -252,8 +276,33 @@ export async function downloadAnnotationVideo(
         // 渲染第一帧
         renderCompositeFrame();
 
-        // 获取canvas流
-        stream = compositeCanvas.captureStream(fps);
+        // 获取canvas流（视频轨道）
+        const canvasStream = compositeCanvas.captureStream(fps);
+        const videoTrack = canvasStream.getVideoTracks()[0];
+
+        // 从原始视频获取音频轨道
+        let audioTrack = null;
+        try {
+          const videoStream = (hiddenVideo as any).captureStream
+            ? (hiddenVideo as any).captureStream()
+            : (hiddenVideo as any).mozCaptureStream?.();
+
+          if (videoStream) {
+            const audioTracks = videoStream.getAudioTracks();
+            if (audioTracks.length > 0) {
+              audioTrack = audioTracks[0];
+            }
+          }
+        } catch (e) {
+          console.warn('无法捕获音频轨道:', e);
+        }
+
+        // 组合视频和音频轨道
+        const tracks = [videoTrack];
+        if (audioTrack) {
+          tracks.push(audioTrack);
+        }
+        stream = new MediaStream(tracks);
 
         // 清理函数
         const cleanup = () => {
@@ -320,13 +369,24 @@ export async function downloadAnnotationVideo(
         const actualEndTime = Math.min(endTime, hiddenVideo.duration);
         const recordDuration = (actualEndTime - startTime) * 1000;
 
+        console.log('[DownloadVideo] 开始录制:', {
+          startTime,
+          actualEndTime,
+          recordDuration: recordDuration / 1000,
+          hasAudio: stream.getAudioTracks().length > 0,
+          hasVideo: stream.getVideoTracks().length > 0,
+          mimeType: options.mimeType
+        });
+
         mediaRecorder.start(100);
 
         const playPromise = hiddenVideo.play();
 
         if (playPromise !== undefined) {
           playPromise.then(() => {
+            console.log('[DownloadVideo] 视频开始播放，将在', recordDuration / 1000, '秒后停止');
             setTimeout(() => {
+              console.log('[DownloadVideo] 录制完成，停止录制');
               mediaRecorder.stop();
               hiddenVideo.pause();
             }, recordDuration);
@@ -336,6 +396,7 @@ export async function downloadAnnotationVideo(
           });
         } else {
           setTimeout(() => {
+            console.log('[DownloadVideo] 录制完成，停止录制');
             mediaRecorder.stop();
             hiddenVideo.pause();
           }, recordDuration);

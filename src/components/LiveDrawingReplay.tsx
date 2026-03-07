@@ -22,7 +22,15 @@ export const LiveDrawingReplay: React.FC<LiveDrawingReplayProps> = ({
   const animationFrameRef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (!isActive || !canvasRef.current) return;
+    console.log('[LiveDrawingReplay] Effect triggered:', {
+      isActive,
+      hasVideoElement: !!videoElement,
+      hasCanvas: !!canvasRef.current,
+      strokesCount: liveDrawingData.strokes?.length,
+      startTimestamp
+    });
+
+    if (!isActive || !videoElement || !canvasRef.current) return;
 
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
