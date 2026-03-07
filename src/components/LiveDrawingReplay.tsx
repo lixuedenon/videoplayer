@@ -20,6 +20,7 @@ export const LiveDrawingReplay: React.FC<LiveDrawingReplayProps> = ({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationFrameRef = useRef<number | null>(null);
+  const lastLoggedSecondRef = useRef<number>(-1);
 
   useEffect(() => {
     console.log('[LiveDrawingReplay] Effect triggered:', {
@@ -73,19 +74,20 @@ export const LiveDrawingReplay: React.FC<LiveDrawingReplayProps> = ({
       // 绘制所有应该显示的笔画
       let drawnCount = 0;
 
-      // 每10帧打印一次所有笔画信息用于调试
-      const shouldLog = Math.random() < 0.1;
-      if (shouldLog) {
-        console.log('[LiveDrawingReplay] All strokes info:', {
+      // 打印所有笔画的详细信息（每秒打印一次）
+      const currentSecond = Math.floor(currentVideoTime);
+      if (currentSecond !== lastLoggedSecondRef.current) {
+        lastLoggedSecondRef.current = currentSecond;
+        console.log('🎨 [Strokes Detail]', {
+          videoTime: currentVideoTime.toFixed(2),
           relativeTime: relativeTime.toFixed(2),
           strokes: liveDrawingData.strokes.map((s, i) => ({
             index: i,
             tool: s.tool,
-            pointsCount: s.points?.length,
-            startTime: s.startTime.toFixed(2),
-            endTime: s.endTime.toFixed(2),
-            duration: (s.endTime - s.startTime).toFixed(2),
-            willShow: relativeTime >= (s.startTime - 0.01)
+            points: s.points?.length || 0,
+            start: s.startTime.toFixed(2),
+            end: s.endTime.toFixed(2),
+            duration: (s.endTime - s.startTime).toFixed(2)
           }))
         });
       }
