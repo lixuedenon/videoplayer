@@ -383,6 +383,14 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
       canvasHeight
     };
 
+    console.log('[VideoPlayer] Saving live drawing:', {
+      startTimestamp: data.startTimestamp,
+      duration: data.duration,
+      strokesCount: liveDrawingData.strokes.length,
+      firstStroke: liveDrawingData.strokes[0],
+      videoCurrentTime: videoRef.current.currentTime
+    });
+
     const drawingData: DrawingData = {
       elements: [],
       canvasWidth,
