@@ -73,11 +73,16 @@ export const LiveDrawingReplay: React.FC<LiveDrawingReplayProps> = ({
       const relativeTime = currentVideoTime - startTimestamp;
 
       // 调试日志
-      if (Math.random() < 0.01) { // 只打印1%的帧
-        console.log('[LiveDrawingReplay] currentVideoTime:', currentVideoTime.toFixed(2),
-                    'startTimestamp:', startTimestamp.toFixed(2),
-                    'relativeTime:', relativeTime.toFixed(2),
-                    'strokes count:', liveDrawingData.strokes.length);
+      if (Math.random() < 0.02) { // 只打印2%的帧
+        console.log('[LiveDrawingReplay] Frame:', {
+          currentVideoTime: currentVideoTime.toFixed(2),
+          startTimestamp: startTimestamp.toFixed(2),
+          relativeTime: relativeTime.toFixed(2),
+          strokesCount: liveDrawingData.strokes.length,
+          videoPaused: videoElement.paused,
+          videoPlaying: !videoElement.paused && !videoElement.ended,
+          videoReadyState: videoElement.readyState
+        });
       }
 
       // 清空画布
@@ -97,15 +102,20 @@ export const LiveDrawingReplay: React.FC<LiveDrawingReplayProps> = ({
 
         // 详细日志第一个笔画
         if (index === 0 && Math.random() < 0.05) {
-          console.log('[LiveDrawingReplay] Drawing stroke:', {
-            index,
+          const isComplete = relativeTime >= stroke.endTime;
+          const strokeDuration = stroke.endTime - stroke.startTime;
+          const strokeProgress = (relativeTime - stroke.startTime) / strokeDuration;
+          console.log('[LiveDrawingReplay] Drawing stroke 0:', {
             tool: stroke.tool,
             color: stroke.color,
-            width: stroke.width,
             pointsCount: stroke.points?.length,
-            startTime: stroke.startTime,
-            endTime: stroke.endTime,
-            relativeTime
+            startTime: stroke.startTime.toFixed(2),
+            endTime: stroke.endTime.toFixed(2),
+            relativeTime: relativeTime.toFixed(2),
+            isComplete,
+            strokeDuration: strokeDuration.toFixed(2),
+            strokeProgress: strokeProgress.toFixed(2),
+            pointsToShow: Math.floor((stroke.points?.length || 0) * strokeProgress)
           });
         }
 
