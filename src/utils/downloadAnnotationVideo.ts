@@ -56,9 +56,9 @@ export async function downloadAnnotationVideo(
     hiddenVideo.style.opacity = '0';
     hiddenVideo.style.pointerEvents = 'none';
     hiddenVideo.crossOrigin = 'anonymous';
-    // 不要mute视频，这样可以保留声音
-    hiddenVideo.muted = false;
-    hiddenVideo.volume = 1;
+    // 录制时静音，避免播放声音（但音频轨道仍会被捕获）
+    hiddenVideo.muted = true;
+    hiddenVideo.volume = 0;
 
     if (videoElement.src) {
       hiddenVideo.src = videoElement.src;
@@ -291,10 +291,15 @@ export async function downloadAnnotationVideo(
             const audioTracks = videoStream.getAudioTracks();
             if (audioTracks.length > 0) {
               audioTrack = audioTracks[0];
+              console.log('[DownloadVideo] 成功捕获音频轨道');
+            } else {
+              console.warn('[DownloadVideo] 视频流中没有音频轨道');
             }
+          } else {
+            console.warn('[DownloadVideo] 无法从视频获取流');
           }
         } catch (e) {
-          console.warn('无法捕获音频轨道:', e);
+          console.warn('[DownloadVideo] 无法捕获音频轨道:', e);
         }
 
         // 组合视频和音频轨道
@@ -303,6 +308,12 @@ export async function downloadAnnotationVideo(
           tracks.push(audioTrack);
         }
         stream = new MediaStream(tracks);
+
+        console.log('[DownloadVideo] 创建合成流:', {
+          hasVideoTrack: !!videoTrack,
+          hasAudioTrack: !!audioTrack,
+          totalTracks: tracks.length
+        });
 
         // 清理函数
         const cleanup = () => {
@@ -369,7 +380,7 @@ export async function downloadAnnotationVideo(
         const actualEndTime = Math.min(endTime, hiddenVideo.duration);
         const recordDuration = (actualEndTime - startTime) * 1000;
 
-        console.log('[DownloadVideo] 开始录制:', {
+        console.log('[DownloadVideo] 准备开始录制:', {
           startTime,
           actualEndTime,
           recordDuration: recordDuration / 1000,
@@ -378,13 +389,18 @@ export async function downloadAnnotationVideo(
           mimeType: options.mimeType
         });
 
-        mediaRecorder.start(100);
-
+        // 先播放视频，等渲染循环启动后再开始录制
         const playPromise = hiddenVideo.play();
 
         if (playPromise !== undefined) {
-          playPromise.then(() => {
-            console.log('[DownloadVideo] 视频开始播放，将在', recordDuration / 1000, '秒后停止');
+          playPromise.then(async () => {
+            console.log('[DownloadVideo] 视频开始播放');
+            // 等待100ms让渲染循环稳定
+            await new Promise(r => setTimeout(r, 100));
+
+            console.log('[DownloadVideo] 开始录制，将在', recordDuration / 1000, '秒后停止');
+            mediaRecorder.start(100);
+
             setTimeout(() => {
               console.log('[DownloadVideo] 录制完成，停止录制');
               mediaRecorder.stop();
@@ -395,11 +411,16 @@ export async function downloadAnnotationVideo(
             reject(error);
           });
         } else {
-          setTimeout(() => {
-            console.log('[DownloadVideo] 录制完成，停止录制');
-            mediaRecorder.stop();
-            hiddenVideo.pause();
-          }, recordDuration);
+          // 回退方案
+          setTimeout(async () => {
+            await new Promise(r => setTimeout(r, 100));
+            mediaRecorder.start(100);
+            setTimeout(() => {
+              console.log('[DownloadVideo] 录制完成，停止录制');
+              mediaRecorder.stop();
+              hiddenVideo.pause();
+            }, recordDuration);
+          }, 0);
         }
       });
 

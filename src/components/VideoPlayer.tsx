@@ -457,7 +457,17 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
 
   const handleSeekToAnnotation = async (annotation: Annotation) => {
     const { timestamp, video_url: targetVideoId, is_live, live_drawing_data } = annotation;
-    
+
+    console.log('[VideoPlayer] handleSeekToAnnotation called:', {
+      id: annotation.id,
+      timestamp,
+      is_live,
+      hasLiveDrawingData: !!live_drawing_data,
+      strokesCount: live_drawing_data?.strokes?.length,
+      targetVideoId,
+      currentVideoId: videoId
+    });
+
     if (targetVideoId && targetVideoId !== videoId) {
       if (onSwitchVideo) {
         onSwitchVideo(targetVideoId, timestamp);
