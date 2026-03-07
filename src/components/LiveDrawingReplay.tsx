@@ -39,6 +39,14 @@ export const LiveDrawingReplay: React.FC<LiveDrawingReplayProps> = ({
       const currentVideoTime = videoElement.currentTime;
       const relativeTime = currentVideoTime - startTimestamp;
 
+      // 调试日志
+      if (Math.random() < 0.01) { // 只打印1%的帧
+        console.log('[LiveDrawingReplay] currentVideoTime:', currentVideoTime.toFixed(2),
+                    'startTimestamp:', startTimestamp.toFixed(2),
+                    'relativeTime:', relativeTime.toFixed(2),
+                    'strokes count:', liveDrawingData.strokes.length);
+      }
+
       // 清空画布
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 

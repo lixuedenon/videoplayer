@@ -240,22 +240,24 @@ export async function downloadAnnotationVideo(
         // 使用requestAnimationFrame持续渲染
         const fps = 30;
         let animationId: number | null = null;
+        let isRecording = false;
 
         const animate = () => {
-          if (!hiddenVideo.paused && !hiddenVideo.ended) {
+          if (isRecording) {
             renderCompositeFrame();
             animationId = requestAnimationFrame(animate);
           }
         };
 
+        // 渲染第一帧
+        renderCompositeFrame();
+
         // 获取canvas流
         stream = compositeCanvas.captureStream(fps);
 
-        // 开始动画循环
-        animate();
-
         // 清理函数
         const cleanup = () => {
+          isRecording = false;
           if (animationId !== null) {
             cancelAnimationFrame(animationId);
           }
@@ -264,6 +266,12 @@ export async function downloadAnnotationVideo(
         // 录制完成后清理
         hiddenVideo.addEventListener('pause', cleanup);
         hiddenVideo.addEventListener('ended', cleanup);
+
+        // 在视频即将播放前启动动画循环
+        hiddenVideo.addEventListener('play', () => {
+          isRecording = true;
+          animate();
+        }, { once: true });
       } else {
         // 没有涂鸦，直接录制视频
         stream = (hiddenVideo as any).captureStream ?
@@ -278,9 +286,20 @@ export async function downloadAnnotationVideo(
       }
 
       const chunks: Blob[] = [];
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: 'video/webm;codecs=vp8,opus'
-      });
+
+      // 尝试不同的编码器，选择浏览器支持的
+      let options = { mimeType: 'video/webm;codecs=vp8' };
+      if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+        options = { mimeType: 'video/webm;codecs=vp9' };
+        if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+          options = { mimeType: 'video/webm' };
+          if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+            options = { mimeType: '' } as any; // 使用默认
+          }
+        }
+      }
+
+      const mediaRecorder = new MediaRecorder(stream, options);
 
       mediaRecorder.ondataavailable = (e) => {
         if (e.data.size > 0) {
