@@ -72,31 +72,29 @@ export const LiveDrawingReplay: React.FC<LiveDrawingReplayProps> = ({
 
       // 绘制所有应该显示的笔画
       let drawnCount = 0;
+
+      // 每10帧打印一次所有笔画信息用于调试
+      const shouldLog = Math.random() < 0.1;
+      if (shouldLog) {
+        console.log('[LiveDrawingReplay] All strokes info:', {
+          relativeTime: relativeTime.toFixed(2),
+          strokes: liveDrawingData.strokes.map((s, i) => ({
+            index: i,
+            tool: s.tool,
+            pointsCount: s.points?.length,
+            startTime: s.startTime.toFixed(2),
+            endTime: s.endTime.toFixed(2),
+            duration: (s.endTime - s.startTime).toFixed(2),
+            willShow: relativeTime >= (s.startTime - 0.01)
+          }))
+        });
+      }
+
       liveDrawingData.strokes.forEach((stroke, index) => {
         // 只绘制已经开始的笔画（使用相对时间比较）
         // 添加小容差以处理精度问题
         if (relativeTime < (stroke.startTime - 0.01)) return;
         drawnCount++;
-
-        // 详细日志第一个笔画
-        if (index === 0 && Math.random() < 0.05) {
-          const isComplete = relativeTime >= stroke.endTime;
-          const strokeDuration = stroke.endTime - stroke.startTime;
-          const strokeProgress = Math.min(1, (relativeTime - stroke.startTime) / strokeDuration);
-          console.log('[LiveDrawingReplay] Drawing stroke 0:', {
-            tool: stroke.tool,
-            color: stroke.color,
-            pointsCount: stroke.points?.length,
-            startTime: stroke.startTime.toFixed(2),
-            endTime: stroke.endTime.toFixed(2),
-            currentVideoTime: currentVideoTime.toFixed(2),
-            relativeTime: relativeTime.toFixed(2),
-            isComplete,
-            strokeDuration: strokeDuration.toFixed(2),
-            strokeProgress: strokeProgress.toFixed(2),
-            pointsToShow: Math.floor((stroke.points?.length || 0) * strokeProgress)
-          });
-        }
 
         // 文字类型：直接绘制文字
         if (stroke.tool === 'text' && stroke.text) {
