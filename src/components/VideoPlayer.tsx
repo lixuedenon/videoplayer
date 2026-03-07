@@ -1088,7 +1088,7 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
             </div>
           )}
 
-          {!isEmbeddedVideo && showLivePlayback && currentPlaybackData && videoRef.current && (
+          {showLivePlayback && currentPlaybackData && videoRef.current && (
             <LiveDrawingReplay
               videoElement={videoRef.current}
               liveDrawingData={currentPlaybackData.liveDrawingData}
