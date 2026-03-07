@@ -62,48 +62,32 @@ export const LiveDrawingReplay: React.FC<LiveDrawingReplayProps> = ({
       if (!isActive) return;
 
       const currentVideoTime = videoElement.currentTime;
-      const relativeTime = currentVideoTime - startTimestamp;
 
-      // 调试日志
-      if (Math.random() < 0.02) { // 只打印2%的帧
-        console.log('[LiveDrawingReplay] Frame:', {
-          currentVideoTime: currentVideoTime.toFixed(2),
-          startTimestamp: startTimestamp.toFixed(2),
-          relativeTime: relativeTime.toFixed(2),
-          strokesCount: liveDrawingData.strokes.length,
-          videoPaused: videoElement.paused,
-          videoPlaying: !videoElement.paused && !videoElement.ended,
-          videoReadyState: videoElement.readyState
-        });
-      }
+      // 关键修复：直接使用currentVideoTime（绝对时间）与笔画时间戳比较
+      // 笔画的startTime/endTime已经是视频的绝对时间，不需要计算相对时间
 
       // 清空画布
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // 添加视觉调试：绘制半透明红色边框确认canvas可见
-      ctx.strokeStyle = 'rgba(255, 0, 0, 0.3)';
-      ctx.lineWidth = 10;
-      ctx.strokeRect(0, 0, canvas.width, canvas.height);
-
       // 绘制所有应该显示的笔画
       let drawnCount = 0;
       liveDrawingData.strokes.forEach((stroke, index) => {
-        // 只绘制已经开始的笔画
-        if (relativeTime < stroke.startTime) return;
+        // 只绘制已经开始的笔画（使用绝对时间比较）
+        if (currentVideoTime < stroke.startTime) return;
         drawnCount++;
 
         // 详细日志第一个笔画
         if (index === 0 && Math.random() < 0.05) {
-          const isComplete = relativeTime >= stroke.endTime;
+          const isComplete = currentVideoTime >= stroke.endTime;
           const strokeDuration = stroke.endTime - stroke.startTime;
-          const strokeProgress = (relativeTime - stroke.startTime) / strokeDuration;
+          const strokeProgress = Math.min(1, (currentVideoTime - stroke.startTime) / strokeDuration);
           console.log('[LiveDrawingReplay] Drawing stroke 0:', {
             tool: stroke.tool,
             color: stroke.color,
             pointsCount: stroke.points?.length,
             startTime: stroke.startTime.toFixed(2),
             endTime: stroke.endTime.toFixed(2),
-            relativeTime: relativeTime.toFixed(2),
+            currentVideoTime: currentVideoTime.toFixed(2),
             isComplete,
             strokeDuration: strokeDuration.toFixed(2),
             strokeProgress: strokeProgress.toFixed(2),
@@ -153,8 +137,8 @@ export const LiveDrawingReplay: React.FC<LiveDrawingReplayProps> = ({
         }
 
         // 画笔/橡皮擦类型：绘制路径
-        const isComplete = relativeTime >= stroke.endTime;
-        
+        const isComplete = currentVideoTime >= stroke.endTime;
+
         if (stroke.points.length < 2) return;
 
         ctx.strokeStyle = stroke.color;
@@ -179,7 +163,7 @@ export const LiveDrawingReplay: React.FC<LiveDrawingReplayProps> = ({
         } else {
           // 笔画正在进行中，按比例绘制
           const strokeDuration = stroke.endTime - stroke.startTime;
-          const strokeProgress = (relativeTime - stroke.startTime) / strokeDuration;
+          const strokeProgress = Math.min(1, (currentVideoTime - stroke.startTime) / strokeDuration);
           const pointsToShow = Math.floor(stroke.points.length * strokeProgress);
 
           if (pointsToShow >= 2) {
