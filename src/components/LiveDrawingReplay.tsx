@@ -58,10 +58,17 @@ export const LiveDrawingReplay: React.FC<LiveDrawingReplayProps> = ({
       // 清空画布
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+      // 添加视觉调试：绘制半透明红色边框确认canvas可见
+      ctx.strokeStyle = 'rgba(255, 0, 0, 0.3)';
+      ctx.lineWidth = 10;
+      ctx.strokeRect(0, 0, canvas.width, canvas.height);
+
       // 绘制所有应该显示的笔画
+      let drawnCount = 0;
       liveDrawingData.strokes.forEach(stroke => {
         // 只绘制已经开始的笔画
         if (relativeTime < stroke.startTime) return;
+        drawnCount++;
 
         // 文字类型：直接绘制文字
         if (stroke.tool === 'text' && stroke.text) {
@@ -146,6 +153,11 @@ export const LiveDrawingReplay: React.FC<LiveDrawingReplayProps> = ({
       });
 
       ctx.globalCompositeOperation = 'source-over';
+
+      // 绘制调试信息：显示有多少笔画被绘制
+      ctx.font = '20px Arial';
+      ctx.fillStyle = 'yellow';
+      ctx.fillText(`Drawing ${drawnCount} strokes`, 10, 30);
 
       // 继续下一帧
       animationFrameRef.current = requestAnimationFrame(renderFrame);
