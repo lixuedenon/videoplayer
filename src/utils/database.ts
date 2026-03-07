@@ -1,5 +1,5 @@
 import { VideoFile } from '../types/video';
-import { Annotation, DrawingData } from '../types/annotation';
+import { Annotation, LiveDrawingData } from '../types/annotation';
 import { VideoSegmentSettings, VideoSegment } from '../types/videoSegment';
 import * as indexedDB from './indexedDB';
 
@@ -99,22 +99,19 @@ export const clearPlaylist = async (): Promise<void> => {
 export const saveAnnotation = async (
   videoUrl: string,
   timestamp: number,
-  drawingData: DrawingData,
+  liveDrawingData: LiveDrawingData,
   thumbnail: string,
   name?: string,
-  textContent?: string,
-  liveDrawingData?: any
+  textContent?: string
 ): Promise<Annotation | null> => {
   try {
     const annotation = await indexedDB.addAnnotation({
       video_url: videoUrl,
       timestamp,
-      drawing_data: drawingData,
+      live_drawing_data: liveDrawingData,
       thumbnail,
       name: name || undefined,
-      text_content: textContent || undefined,
-      live_drawing_data: liveDrawingData || null,
-      is_live: !!liveDrawingData
+      text_content: textContent || undefined
     });
 
     return annotation;

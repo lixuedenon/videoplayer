@@ -9,11 +9,10 @@ import { ScreenRecorder } from '../utils/screenRecorder';
 import { LiveDrawingOverlay } from './LiveDrawingOverlay';
 import { LiveDrawingReplay } from './LiveDrawingReplay';
 import { AnnotationsList } from './AnnotationsList';
-import { Annotation, DrawingData } from '../types/annotation';
+import { Annotation, LiveDrawingData } from '../types/annotation';
 import { saveAnnotation, getAnnotations, deleteAnnotation } from '../utils/database';
 import { VideoSegmentSettings } from '../types/videoSegment';
 import { VideoFile } from '../types/video';
-import { extractTextFromDrawingData } from '../utils/videoSegmentDownload';
 import { saveScreenshot, checkFileSystemSupport } from '../utils/localFileStorage';
 import { parseVideoUrl, supportsFullFeatures } from '../utils/videoUrlParser';
 import { EmbeddedVideoPlayer } from './EmbeddedVideoPlayer';
@@ -361,7 +360,7 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
     const canvasWidth = liveCanvas?.width || videoRef.current.videoWidth || 1280;
     const canvasHeight = liveCanvas?.height || videoRef.current.videoHeight || 720;
 
-    const liveDrawingData = {
+    const liveDrawingData: LiveDrawingData = {
       strokes: data.strokes.map(stroke => ({
         tool: stroke.tool,
         color: stroke.color,
@@ -391,12 +390,6 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
       videoCurrentTime: videoRef.current.currentTime
     });
 
-    const drawingData: DrawingData = {
-      elements: [],
-      canvasWidth,
-      canvasHeight
-    };
-
     const videoName = videoId.split('/').pop() || 'video';
     let filePath: string | null = null;
     let finalThumbnail = data.thumbnail;
@@ -413,7 +406,7 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
         canvas.width = canvasWidth;
         canvas.height = canvasHeight;
         const ctx = canvas.getContext('2d');
-        
+
         if (ctx) {
           ctx.drawImage(img, 0, 0);
         }
@@ -436,14 +429,12 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
       await saveAnnotation(
         videoId,
         data.startTimestamp,
-        drawingData,
+        liveDrawingData,
         finalThumbnail,
         data.name,
-        '',
-        liveDrawingData
+        ''
       );
 
-      // 重新加载当前视频的标注（传递videoId避免获取所有标注）
       await loadAnnotations();
 
       if (onAnnotationChange) {
@@ -464,12 +455,11 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
   };
 
   const handleSeekToAnnotation = async (annotation: Annotation) => {
-    const { timestamp, video_url: targetVideoId, is_live, live_drawing_data } = annotation;
+    const { timestamp, video_url: targetVideoId, live_drawing_data } = annotation;
 
     console.log('[VideoPlayer] handleSeekToAnnotation called:', {
       id: annotation.id,
       timestamp,
-      is_live,
       hasLiveDrawingData: !!live_drawing_data,
       strokesCount: live_drawing_data?.strokes?.length,
       targetVideoId,
@@ -487,35 +477,30 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
     if (!videoRef.current) return;
 
     const video = videoRef.current;
-    
-    const startTime = (is_live && live_drawing_data) 
-      ? timestamp
-      : Math.max(0, timestamp - replayBufferBefore);
-    
-    const endTime = Math.min(duration, timestamp + (live_drawing_data?.duration || replayBufferAfter));
+
+    const startTime = Math.max(0, timestamp - replayBufferBefore);
+    const endTime = Math.min(duration, timestamp + live_drawing_data.duration + replayBufferAfter);
 
     video.currentTime = startTime;
     setCurrentTime(startTime);
     seekTargetEndTime.current = endTime;
 
-    if (is_live && live_drawing_data) {
-      console.log('[VideoPlayer] 启动涂鸦回放:', {
-        timestamp,
-        strokesCount: live_drawing_data.strokes?.length,
-        duration: live_drawing_data.duration,
-        canvasWidth: live_drawing_data.canvasWidth,
-        canvasHeight: live_drawing_data.canvasHeight
-      });
-      playbackStartTimeRef.current = Date.now();
-      setCurrentPlaybackData({
-        liveDrawingData: live_drawing_data,
-        startTimestamp: timestamp
-      });
-      setShowLivePlayback(true);
-    } else {
-      setShowLivePlayback(false);
-      setCurrentPlaybackData(null);
-    }
+    console.log('[VideoPlayer] 启动涂鸦回放:', {
+      timestamp,
+      startTime,
+      endTime,
+      strokesCount: live_drawing_data.strokes?.length,
+      duration: live_drawing_data.duration,
+      canvasWidth: live_drawing_data.canvasWidth,
+      canvasHeight: live_drawing_data.canvasHeight
+    });
+
+    playbackStartTimeRef.current = Date.now();
+    setCurrentPlaybackData({
+      liveDrawingData: live_drawing_data,
+      startTimestamp: timestamp
+    });
+    setShowLivePlayback(true);
 
     try {
       await video.play();
