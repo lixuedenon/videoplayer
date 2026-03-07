@@ -41,6 +41,14 @@ export const LiveDrawingReplay: React.FC<LiveDrawingReplayProps> = ({
     canvas.width = liveDrawingData.canvasWidth;
     canvas.height = liveDrawingData.canvasHeight;
 
+    console.log('[LiveDrawingReplay] Canvas setup:', {
+      canvasWidth: canvas.width,
+      canvasHeight: canvas.height,
+      canvasStyle: window.getComputedStyle(canvas),
+      canvasPosition: canvas.getBoundingClientRect(),
+      zIndex: canvas.style.zIndex
+    });
+
     const renderFrame = () => {
       if (!isActive) return;
 
@@ -65,10 +73,24 @@ export const LiveDrawingReplay: React.FC<LiveDrawingReplayProps> = ({
 
       // 绘制所有应该显示的笔画
       let drawnCount = 0;
-      liveDrawingData.strokes.forEach(stroke => {
+      liveDrawingData.strokes.forEach((stroke, index) => {
         // 只绘制已经开始的笔画
         if (relativeTime < stroke.startTime) return;
         drawnCount++;
+
+        // 详细日志第一个笔画
+        if (index === 0 && Math.random() < 0.05) {
+          console.log('[LiveDrawingReplay] Drawing stroke:', {
+            index,
+            tool: stroke.tool,
+            color: stroke.color,
+            width: stroke.width,
+            pointsCount: stroke.points?.length,
+            startTime: stroke.startTime,
+            endTime: stroke.endTime,
+            relativeTime
+          });
+        }
 
         // 文字类型：直接绘制文字
         if (stroke.tool === 'text' && stroke.text) {
