@@ -2,19 +2,7 @@
 // 视频播放器主组件
 
 import React, { useRef, useEffect, useState } from 'react';
-import {
-  Play,
-  Pause,
-  Volume2,
-  VolumeX,
-  SkipBack,
-  SkipForward,
-  Maximize,
-  Paintbrush,
-  BookmarkIcon,
-  Circle,
-  Square
-} from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, SkipBack, SkipForward, Maximize, Paintbrush, Bookmark as BookmarkIcon, Circle, Square } from 'lucide-react';
 import { CustomizableButton } from './CustomizableButton';
 import { ButtonShape } from '../types/buttonCustomization';
 import { ScreenRecorder } from '../utils/screenRecorder';
