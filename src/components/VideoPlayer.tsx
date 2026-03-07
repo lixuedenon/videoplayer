@@ -435,9 +435,9 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
         liveDrawingData
       );
 
-      const updatedAnnotations = await getAnnotations();
-      setAnnotations(updatedAnnotations);
-      
+      // 重新加载当前视频的标注（传递videoId避免获取所有标注）
+      await loadAnnotations();
+
       if (onAnnotationChange) {
         onAnnotationChange();
       }
