@@ -44,27 +44,19 @@ export const LiveDrawingReplay: React.FC<LiveDrawingReplayProps> = ({
     const canvasRect = canvas.getBoundingClientRect();
     const computedStyle = window.getComputedStyle(canvas);
     console.log('[LiveDrawingReplay] Canvas setup:', {
-      // Canvas实际绘制尺寸
       canvasWidth: canvas.width,
       canvasHeight: canvas.height,
-      // CSS显示尺寸
-      cssWidth: computedStyle.width,
-      cssHeight: computedStyle.height,
-      // 屏幕位置和尺寸
-      boundingRect: {
-        width: canvasRect.width,
-        height: canvasRect.height,
-        top: canvasRect.top,
-        left: canvasRect.left
-      },
-      // 视频元素尺寸
-      videoWidth: videoElement.offsetWidth,
-      videoHeight: videoElement.offsetHeight,
-      videoVideoWidth: videoElement.videoWidth,
-      videoVideoHeight: videoElement.videoHeight,
-      // 是否匹配
-      dimensionsMatch: canvas.width === canvasRect.width && canvas.height === canvasRect.height
+      strokesCount: liveDrawingData.strokes.length
     });
+
+    // 关键：打印所有笔画的时间信息
+    console.log('[LiveDrawingReplay] Strokes timing:', liveDrawingData.strokes.map((s, i) => ({
+      index: i,
+      tool: s.tool,
+      startTime: s.startTime?.toFixed(2) || 'N/A',
+      endTime: s.endTime?.toFixed(2) || 'N/A',
+      duration: ((s.endTime || 0) - (s.startTime || 0)).toFixed(2)
+    })));
 
     const renderFrame = () => {
       if (!isActive) return;
