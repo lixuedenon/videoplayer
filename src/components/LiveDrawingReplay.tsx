@@ -41,12 +41,29 @@ export const LiveDrawingReplay: React.FC<LiveDrawingReplayProps> = ({
     canvas.width = liveDrawingData.canvasWidth;
     canvas.height = liveDrawingData.canvasHeight;
 
+    const canvasRect = canvas.getBoundingClientRect();
+    const computedStyle = window.getComputedStyle(canvas);
     console.log('[LiveDrawingReplay] Canvas setup:', {
+      // Canvas实际绘制尺寸
       canvasWidth: canvas.width,
       canvasHeight: canvas.height,
-      canvasStyle: window.getComputedStyle(canvas),
-      canvasPosition: canvas.getBoundingClientRect(),
-      zIndex: canvas.style.zIndex
+      // CSS显示尺寸
+      cssWidth: computedStyle.width,
+      cssHeight: computedStyle.height,
+      // 屏幕位置和尺寸
+      boundingRect: {
+        width: canvasRect.width,
+        height: canvasRect.height,
+        top: canvasRect.top,
+        left: canvasRect.left
+      },
+      // 视频元素尺寸
+      videoWidth: videoElement.offsetWidth,
+      videoHeight: videoElement.offsetHeight,
+      videoVideoWidth: videoElement.videoWidth,
+      videoVideoHeight: videoElement.videoHeight,
+      // 是否匹配
+      dimensionsMatch: canvas.width === canvasRect.width && canvas.height === canvasRect.height
     });
 
     const renderFrame = () => {
