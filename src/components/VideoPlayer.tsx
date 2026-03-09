@@ -376,7 +376,8 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
         text: stroke.text,
         fontSize: stroke.fontSize,
         shapeType: stroke.shapeType,
-        filled: stroke.filled
+        filled: stroke.filled,
+        rotation: stroke.rotation  // 保存rotation字段（用于形状和符号旋转）
       })),
       duration: data.duration,
       canvasWidth,
