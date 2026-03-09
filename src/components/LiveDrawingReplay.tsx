@@ -132,10 +132,21 @@ export const LiveDrawingReplay: React.FC<LiveDrawingReplayProps> = ({
           return;
         }
 
-        // 形状类型：直接显示
+        // 形状类型：按进度显示（拖动放大效果）
         if (stroke.tool === 'shape' && stroke.shapeType && stroke.points.length >= 2) {
           ctx.save();
-          drawShape(ctx, stroke.shapeType, stroke.points[0], stroke.points[1], {
+
+          // 如果形状正在绘制中，按进度插值
+          let endPoint = stroke.points[1];
+          if (!isComplete) {
+            const startPoint = stroke.points[0];
+            endPoint = {
+              x: startPoint.x + (stroke.points[1].x - startPoint.x) * strokeProgress,
+              y: startPoint.y + (stroke.points[1].y - startPoint.y) * strokeProgress
+            };
+          }
+
+          drawShape(ctx, stroke.shapeType, stroke.points[0], endPoint, {
             color: stroke.color,
             width: stroke.width,
             filled: stroke.filled || false,

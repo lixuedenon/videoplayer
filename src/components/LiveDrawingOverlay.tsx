@@ -78,6 +78,7 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
   const [showCustomSymbolManager, setShowCustomSymbolManager] = useState(false);
   const [isShapeDrawing, setIsShapeDrawing] = useState(false);
   const [shapeStartPoint, setShapeStartPoint] = useState<Point | null>(null);
+  const [shapeStartTime, setShapeStartTime] = useState<number>(0);
   const [strokes, setStrokes] = useState<Stroke[]>([]);
   const [currentStroke, setCurrentStroke] = useState<Point[]>([]);
   const [startTimestamp, setStartTimestamp] = useState<number>(0);
@@ -374,6 +375,7 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
       if (!selectedShape || !videoElement) return;
       setIsShapeDrawing(true);
       setShapeStartPoint(point);
+      setShapeStartTime(videoElement.currentTime - startTimestamp);
       return;
     }
     
@@ -743,16 +745,16 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
         color: penColor,
         width: penWidth,
         points: [shapeStartPoint, point],
-        startTime: videoElement.currentTime - startTimestamp,
+        startTime: shapeStartTime,
         endTime: videoElement.currentTime - startTimestamp,
         shapeType: selectedShape.type,
         filled: false
       };
-      
+
       setStrokes(prev => [...prev, shapeStroke]);
       setIsShapeDrawing(false);
       setShapeStartPoint(null);
-      
+
       // 注意：不要立即调用redrawCanvas，让useEffect处理
       return;
     }
