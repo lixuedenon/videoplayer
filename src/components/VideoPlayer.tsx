@@ -127,7 +127,8 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
 
   const loadAnnotations = async () => {
     if (!videoId) return;
-    const data = await getAnnotations(videoId);
+    const videoName = videoId.split('/').pop() || videoId;
+    const data = await getAnnotations(videoName);
     setAnnotations(data);
   };
 
@@ -428,6 +429,7 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
     try {
       await saveAnnotation(
         videoId,
+        videoName,
         data.startTimestamp,
         liveDrawingData,
         finalThumbnail,
@@ -447,7 +449,11 @@ const VideoPlayerComponent: React.FC<VideoPlayerProps> = ({
   };
 
   const handleDeleteAnnotation = async (id: string) => {
-    const success = await deleteAnnotation(id);
+    const annotation = annotations.find(a => a.id === id);
+    if (!annotation) return;
+
+    const videoName = annotation.video_url.split('/').pop() || annotation.video_url;
+    const success = await deleteAnnotation(id, videoName, annotation.timestamp);
     if (success) {
       setAnnotations(prev => prev.filter(a => a.id !== id));
       onAnnotationChange?.();
