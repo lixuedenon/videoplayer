@@ -103,10 +103,9 @@ export const LiveDrawingReplay: React.FC<LiveDrawingReplayProps> = ({
         const strokeDuration = stroke.endTime - stroke.startTime;
         const strokeProgress = Math.min(1, Math.max(0, (relativeTime - stroke.startTime) / strokeDuration));
 
-        // 文字类型：淡入效果
+        // 文字类型：直接显示
         if (stroke.tool === 'text' && stroke.text) {
           ctx.save();
-          ctx.globalAlpha = strokeProgress;
           ctx.font = `${stroke.fontSize || 24}px Arial`;
           ctx.fillStyle = stroke.color;
           ctx.textAlign = 'left';
@@ -116,12 +115,10 @@ export const LiveDrawingReplay: React.FC<LiveDrawingReplayProps> = ({
           return;
         }
 
-        // 符号类型：淡入效果
+        // 符号类型：直接显示
         if (stroke.tool === 'symbol' && stroke.symbolChar) {
           ctx.save();
-          ctx.globalAlpha = strokeProgress;
           ctx.translate(stroke.points[0].x, stroke.points[0].y);
-          // 支持两种旋转字段：rotation（新）和symbolRotation（旧）
           const rotation = stroke.rotation !== undefined ? stroke.rotation : stroke.symbolRotation;
           if (rotation) {
             ctx.rotate((rotation * Math.PI) / 180);
@@ -135,10 +132,9 @@ export const LiveDrawingReplay: React.FC<LiveDrawingReplayProps> = ({
           return;
         }
 
-        // 形状类型：淡入效果
+        // 形状类型：直接显示
         if (stroke.tool === 'shape' && stroke.shapeType && stroke.points.length >= 2) {
           ctx.save();
-          ctx.globalAlpha = strokeProgress;
           drawShape(ctx, stroke.shapeType, stroke.points[0], stroke.points[1], {
             color: stroke.color,
             width: stroke.width,
