@@ -92,12 +92,55 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
   const [dragStartPoint, setDragStartPoint] = useState<Point | null>(null);
   const [activeControlPoint, setActiveControlPoint] = useState<string | null>(null); // 'tl', 'tr', 'bl', 'br', 'tm', 'bm', 'ml', 'mr', 'rotate'
 
+  // 高频录制状态
+  const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
   // 初始化开始时间
   useEffect(() => {
     if (isActive && videoElement) {
       setStartTimestamp(videoElement.currentTime);
     }
   }, [isActive, videoElement]);
+
+  // 高频录制：每20ms记录一次所有形状状态（方案1）
+  useEffect(() => {
+    if (!isActive || !videoElement) {
+      // 清理定时器
+      if (recordingIntervalRef.current) {
+        clearInterval(recordingIntervalRef.current);
+        recordingIntervalRef.current = null;
+      }
+      return;
+    }
+
+    // 启动高频记录
+    recordingIntervalRef.current = setInterval(() => {
+      recordStateSnapshot();
+    }, 20); // 每20ms = 50fps
+
+    return () => {
+      if (recordingIntervalRef.current) {
+        clearInterval(recordingIntervalRef.current);
+        recordingIntervalRef.current = null;
+      }
+    };
+  }, [isActive, videoElement, strokes]);
+
+  // 记录当前所有形状的状态快照
+  const recordStateSnapshot = () => {
+    if (!videoElement) return;
+
+    const currentTime = videoElement.currentTime - startTimestamp;
+
+    // 更新所有stroke的endTime为当前时间
+    // 这样每个stroke在回放时会一直显示到最新的记录点
+    setStrokes(prevStrokes =>
+      prevStrokes.map(stroke => ({
+        ...stroke,
+        endTime: currentTime
+      }))
+    );
+  };
 
   // 初始化canvas
   useEffect(() => {
