@@ -577,10 +577,15 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
     // 画笔/橡皮擦
     if (!isDrawing) return;
 
-    const newStroke = [...currentStroke, point];
+    // 添加时间戳用于回放，但不影响绘制流畅度
+    const pointWithTimestamp = {
+      ...point,
+      timestamp: videoElement ? videoElement.currentTime - startTimestamp : 0
+    };
+    const newStroke = [...currentStroke, pointWithTimestamp];
     setCurrentStroke(newStroke);
 
-    // 实时绘制当前笔画段
+    // 实时绘制当前笔画段（增量绘制，保持流畅）
     const canvas = canvasRef.current;
     if (!canvas) return;
 
