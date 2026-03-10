@@ -1,7 +1,7 @@
 import { VideoFile } from '../types/video';
-import { Annotation, LiveDrawingData } from '../types/annotation';
+import { Annotation, DrawingData } from '../types/annotation';
 import { VideoSegmentSettings, VideoSegment } from '../types/videoSegment';
-import * as localFileStorage from './localFileStorage';
+import * as indexedDB from './indexedDB';
 
 const PLAYER_STATE_KEY = 'player_state';
 const VIDEO_PROGRESS_KEY = 'video_progress';
@@ -98,39 +98,25 @@ export const clearPlaylist = async (): Promise<void> => {
 
 export const saveAnnotation = async (
   videoUrl: string,
-  videoName: string,
   timestamp: number,
-  liveDrawingData: LiveDrawingData,
+  drawingData: DrawingData,
   thumbnail: string,
   name?: string,
-  textContent?: string
+  textContent?: string,
+  liveDrawingData?: any
 ): Promise<Annotation | null> => {
   try {
-    const id = crypto.randomUUID();
-    const created_at = new Date().toISOString();
-
-    const annotation: Annotation = {
-      id,
+    const annotation = await indexedDB.addAnnotation({
       video_url: videoUrl,
       timestamp,
-      live_drawing_data: liveDrawingData,
+      drawing_data: drawingData,
       thumbnail,
       name: name || undefined,
       text_content: textContent || undefined,
-      created_at
-    };
+      live_drawing_data: liveDrawingData || null,
+      is_live: !!liveDrawingData
+    });
 
-    const filePath = await localFileStorage.saveAnnotationJSON(
-      videoName,
-      timestamp,
-      annotation
-    );
-
-    if (!filePath) {
-      throw new Error('Failed to save annotation to file system');
-    }
-
-    console.log('Annotation saved to:', filePath);
     return annotation;
   } catch (error) {
     console.error('Error saving annotation:', error);
@@ -138,44 +124,19 @@ export const saveAnnotation = async (
   }
 };
 
-export const getAnnotations = async (videoName?: string): Promise<Annotation[]> => {
+export const getAnnotations = async (videoUrl?: string): Promise<Annotation[]> => {
   try {
-    const folders = videoName ? [videoName] : await localFileStorage.listVideoFolders();
-    const allAnnotations: Annotation[] = [];
-
-    for (const folderName of folders) {
-      const files = await localFileStorage.listFilesInFolder(folderName);
-
-      for (const file of files) {
-        if (file.name.endsWith('_annotation.json')) {
-          const filePath = `${folderName}/${file.name}`;
-          const annotationData = await localFileStorage.loadAnnotationJSON(filePath);
-
-          if (annotationData) {
-            allAnnotations.push(annotationData);
-          }
-        }
-      }
-    }
-
-    allAnnotations.sort((a, b) => a.timestamp - b.timestamp);
-    return allAnnotations;
+    const annotations = await indexedDB.getAnnotations(videoUrl);
+    return annotations;
   } catch (error) {
     console.error('Error fetching annotations:', error);
     return [];
   }
 };
 
-export const deleteAnnotation = async (id: string, videoName: string, timestamp: number): Promise<boolean> => {
+export const deleteAnnotation = async (id: string): Promise<boolean> => {
   try {
-    const timestampStr = localFileStorage.formatTimestamp(timestamp);
-    const annotationPath = `${localFileStorage.sanitizeFileName(videoName)}/${timestampStr}_annotation.json`;
-    const result = await localFileStorage.deleteFile(annotationPath);
-
-    if (result) {
-      console.log('Annotation deleted:', annotationPath);
-    }
-
+    const result = await indexedDB.deleteAnnotation(id);
     return result;
   } catch (error) {
     console.error('Error deleting annotation:', error);
@@ -197,26 +158,7 @@ export const saveVideoSegmentSettings = async (settings: VideoSegmentSettings): 
 
 export const saveVideoSegment = async (segment: Omit<VideoSegment, 'id' | 'created_at'>): Promise<VideoSegment | null> => {
   try {
-    const id = crypto.randomUUID();
-    const created_at = new Date().toISOString();
-
-    const videoSegment: VideoSegment = {
-      ...segment,
-      id,
-      created_at
-    };
-
-    const filePath = await localFileStorage.saveVideoSegmentJSON(
-      segment.video_name,
-      segment.start_time,
-      videoSegment
-    );
-
-    if (!filePath) {
-      throw new Error('Failed to save video segment metadata to file system');
-    }
-
-    console.log('Video segment metadata saved to:', filePath);
+    const videoSegment = await indexedDB.addVideoSegment(segment);
     return videoSegment;
   } catch (error) {
     console.error('Error saving video segment:', error);
@@ -224,48 +166,20 @@ export const saveVideoSegment = async (segment: Omit<VideoSegment, 'id' | 'creat
   }
 };
 
-export const getVideoSegments = async (videoName?: string): Promise<VideoSegment[]> => {
+export const getVideoSegments = async (videoUrl?: string): Promise<VideoSegment[]> => {
   try {
-    const folders = videoName ? [videoName] : await localFileStorage.listVideoFolders();
-    const allSegments: VideoSegment[] = [];
-
-    for (const folderName of folders) {
-      const files = await localFileStorage.listFilesInFolder(folderName);
-
-      for (const file of files) {
-        if (file.name.endsWith('_segment.json')) {
-          const filePath = `${folderName}/${file.name}`;
-          const segmentData = await localFileStorage.loadVideoSegmentJSON(filePath);
-
-          if (segmentData) {
-            allSegments.push(segmentData);
-          }
-        }
-      }
-    }
-
-    allSegments.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
-    return allSegments;
+    const segments = await indexedDB.getVideoSegments(videoUrl);
+    return segments;
   } catch (error) {
     console.error('Error fetching video segments:', error);
     return [];
   }
 };
 
-export const deleteVideoSegment = async (id: string, videoName: string, startTime: number): Promise<boolean> => {
+export const deleteVideoSegment = async (id: string): Promise<boolean> => {
   try {
-    const timestampStr = localFileStorage.formatTimestamp(startTime);
-    const segmentJsonPath = `${localFileStorage.sanitizeFileName(videoName)}/${timestampStr}_segment.json`;
-    const segmentVideoPath = `${localFileStorage.sanitizeFileName(videoName)}/${timestampStr}_segment.webm`;
-
-    const jsonDeleted = await localFileStorage.deleteFile(segmentJsonPath);
-    const videoDeleted = await localFileStorage.deleteFile(segmentVideoPath);
-
-    if (jsonDeleted || videoDeleted) {
-      console.log('Video segment deleted:', segmentJsonPath);
-    }
-
-    return jsonDeleted && videoDeleted;
+    const result = await indexedDB.deleteVideoSegment(id);
+    return result;
   } catch (error) {
     console.error('Error deleting video segment:', error);
     return false;
@@ -278,17 +192,8 @@ export const searchAnnotations = async (query: string): Promise<Annotation[]> =>
       return [];
     }
 
-    const allAnnotations = await getAnnotations();
-    const lowerQuery = query.toLowerCase();
-
-    const filtered = allAnnotations.filter(annotation => {
-      const nameMatch = annotation.name?.toLowerCase().includes(lowerQuery);
-      const textMatch = annotation.text_content?.toLowerCase().includes(lowerQuery);
-      return nameMatch || textMatch;
-    });
-
-    filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-    return filtered;
+    const results = await indexedDB.searchAnnotations(query);
+    return results;
   } catch (error) {
     console.error('Error searching annotations:', error);
     return [];

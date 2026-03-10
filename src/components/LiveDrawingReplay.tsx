@@ -20,18 +20,9 @@ export const LiveDrawingReplay: React.FC<LiveDrawingReplayProps> = ({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationFrameRef = useRef<number | null>(null);
-  const lastLoggedSecondRef = useRef<number>(-1);
 
   useEffect(() => {
-    console.log('[LiveDrawingReplay] Effect triggered:', {
-      isActive,
-      hasVideoElement: !!videoElement,
-      hasCanvas: !!canvasRef.current,
-      strokesCount: liveDrawingData.strokes?.length,
-      startTimestamp
-    });
-
-    if (!isActive || !videoElement || !canvasRef.current) return;
+    if (!isActive || !canvasRef.current) return;
 
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
@@ -42,144 +33,42 @@ export const LiveDrawingReplay: React.FC<LiveDrawingReplayProps> = ({
     canvas.width = liveDrawingData.canvasWidth;
     canvas.height = liveDrawingData.canvasHeight;
 
-    const canvasRect = canvas.getBoundingClientRect();
-    const computedStyle = window.getComputedStyle(canvas);
-    console.log('[LiveDrawingReplay] Canvas setup:', {
-      canvasWidth: canvas.width,
-      canvasHeight: canvas.height,
-      strokesCount: liveDrawingData.strokes.length
-    });
-
-    // 关键：打印所有笔画的时间信息
-    console.log('[LiveDrawingReplay] Strokes timing:', liveDrawingData.strokes.map((s, i) => ({
-      index: i,
-      tool: s.tool,
-      startTime: s.startTime?.toFixed(2) || 'N/A',
-      endTime: s.endTime?.toFixed(2) || 'N/A',
-      duration: ((s.endTime || 0) - (s.startTime || 0)).toFixed(2)
-    })));
-
     const renderFrame = () => {
       if (!isActive) return;
 
       const currentVideoTime = videoElement.currentTime;
-
-      // 关键修复：笔画的startTime/endTime是相对时间（从0开始）
-      // 需要计算相对于涂鸦开始时间的偏移量
       const relativeTime = currentVideoTime - startTimestamp;
 
       // 清空画布
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       // 绘制所有应该显示的笔画
-      let drawnCount = 0;
+      liveDrawingData.strokes.forEach(stroke => {
+        // 只绘制已经开始的笔画
+        if (relativeTime < stroke.startTime) return;
 
-      // 打印所有笔画的详细信息（每秒打印一次）
-      const currentSecond = Math.floor(currentVideoTime);
-      if (currentSecond !== lastLoggedSecondRef.current) {
-        lastLoggedSecondRef.current = currentSecond;
-        console.log('🎨 [Strokes Detail]', {
-          videoTime: currentVideoTime.toFixed(2),
-          relativeTime: relativeTime.toFixed(2),
-          strokes: liveDrawingData.strokes.map((s, i) => ({
-            index: i,
-            tool: s.tool,
-            points: s.points?.length || 0,
-            start: s.startTime.toFixed(2),
-            end: s.endTime.toFixed(2),
-            duration: (s.endTime - s.startTime).toFixed(2)
-          }))
-        });
-      }
-
-      liveDrawingData.strokes.forEach((stroke, index) => {
-        // 只绘制已经开始的笔画（使用相对时间比较）
-        // 添加小容差以处理精度问题
-        if (relativeTime < (stroke.startTime - 0.01)) return;
-        drawnCount++;
-
-        // 检查笔画是否已完成（适用于所有类型）
-        const isComplete = relativeTime >= stroke.endTime;
-        const strokeDuration = stroke.endTime - stroke.startTime;
-        const strokeProgress = Math.min(1, Math.max(0, (relativeTime - stroke.startTime) / strokeDuration));
-
-        // 计算当前时刻的变换状态（使用关键帧插值）
-        let currentPoints = stroke.points;
-        let currentRotation = stroke.rotation;
-        let currentSymbolSize = stroke.symbolSize;
-        let currentFontSize = stroke.fontSize;
-
-        if (stroke.transforms && stroke.transforms.length > 0) {
-          // 找到当前时间对应的关键帧区间
-          const transforms = stroke.transforms;
-
-          // 找到最后一个时间小于等于当前时间的关键帧
-          let prevKeyframe = null;
-          let nextKeyframe = null;
-
-          for (let i = 0; i < transforms.length; i++) {
-            if (transforms[i].time <= relativeTime) {
-              prevKeyframe = transforms[i];
-            } else if (nextKeyframe === null && transforms[i].time > relativeTime) {
-              nextKeyframe = transforms[i];
-              break;
-            }
-          }
-
-          // 如果有关键帧，进行插值
-          if (prevKeyframe) {
-            if (nextKeyframe) {
-              // 在两个关键帧之间插值
-              const t = (relativeTime - prevKeyframe.time) / (nextKeyframe.time - prevKeyframe.time);
-
-              if (prevKeyframe.points && nextKeyframe.points) {
-                currentPoints = prevKeyframe.points.map((p, i) => ({
-                  x: p.x + (nextKeyframe.points![i].x - p.x) * t,
-                  y: p.y + (nextKeyframe.points![i].y - p.y) * t
-                }));
-              }
-
-              if (prevKeyframe.rotation !== undefined && nextKeyframe.rotation !== undefined) {
-                currentRotation = prevKeyframe.rotation + (nextKeyframe.rotation - prevKeyframe.rotation) * t;
-              }
-
-              if (prevKeyframe.symbolSize !== undefined && nextKeyframe.symbolSize !== undefined) {
-                currentSymbolSize = prevKeyframe.symbolSize + (nextKeyframe.symbolSize - prevKeyframe.symbolSize) * t;
-              }
-
-              if (prevKeyframe.fontSize !== undefined && nextKeyframe.fontSize !== undefined) {
-                currentFontSize = prevKeyframe.fontSize + (nextKeyframe.fontSize - prevKeyframe.fontSize) * t;
-              }
-            } else {
-              // 使用最后一个关键帧的值
-              if (prevKeyframe.points) currentPoints = prevKeyframe.points;
-              if (prevKeyframe.rotation !== undefined) currentRotation = prevKeyframe.rotation;
-              if (prevKeyframe.symbolSize !== undefined) currentSymbolSize = prevKeyframe.symbolSize;
-              if (prevKeyframe.fontSize !== undefined) currentFontSize = prevKeyframe.fontSize;
-            }
-          }
-        }
-
-        // 文字类型：使用插值后的值
+        // 文字类型：直接绘制文字
         if (stroke.tool === 'text' && stroke.text) {
           ctx.save();
-          ctx.font = `${currentFontSize || 24}px Arial`;
+          ctx.font = `${stroke.fontSize || 24}px Arial`;
           ctx.fillStyle = stroke.color;
           ctx.textAlign = 'left';
           ctx.textBaseline = 'top';
-          ctx.fillText(stroke.text, currentPoints[0].x, currentPoints[0].y);
+          ctx.fillText(stroke.text, stroke.points[0].x, stroke.points[0].y);
           ctx.restore();
           return;
         }
 
-        // 符号类型：使用插值后的值
+        // 符号类型：直接绘制符号
         if (stroke.tool === 'symbol' && stroke.symbolChar) {
           ctx.save();
-          ctx.translate(currentPoints[0].x, currentPoints[0].y);
-          if (currentRotation) {
-            ctx.rotate((currentRotation * Math.PI) / 180);
+          ctx.translate(stroke.points[0].x, stroke.points[0].y);
+          // 支持两种旋转字段：rotation（新）和symbolRotation（旧）
+          const rotation = stroke.rotation !== undefined ? stroke.rotation : stroke.symbolRotation;
+          if (rotation) {
+            ctx.rotate((rotation * Math.PI) / 180);
           }
-          ctx.font = `${currentSymbolSize || 40}px Arial`;
+          ctx.font = `${stroke.symbolSize || 40}px Arial`;
           ctx.fillStyle = stroke.color;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
@@ -188,31 +77,20 @@ export const LiveDrawingReplay: React.FC<LiveDrawingReplayProps> = ({
           return;
         }
 
-        // 形状类型：使用插值后的值
-        if (stroke.tool === 'shape' && stroke.shapeType && currentPoints.length >= 2) {
-          ctx.save();
-
-          // 如果形状正在绘制中（首次创建），按进度插值
-          let endPoint = currentPoints[1];
-          if (!isComplete && (!stroke.transforms || stroke.transforms.length === 0)) {
-            const startPoint = currentPoints[0];
-            endPoint = {
-              x: startPoint.x + (currentPoints[1].x - startPoint.x) * strokeProgress,
-              y: startPoint.y + (currentPoints[1].y - startPoint.y) * strokeProgress
-            };
-          }
-
-          drawShape(ctx, stroke.shapeType, currentPoints[0], endPoint, {
+        // 形状类型：使用drawShape绘制
+        if (stroke.tool === 'shape' && stroke.shapeType && stroke.points.length >= 2) {
+          drawShape(ctx, stroke.shapeType, stroke.points[0], stroke.points[1], {
             color: stroke.color,
             width: stroke.width,
             filled: stroke.filled || false,
-            rotation: currentRotation
+            rotation: stroke.rotation
           });
-          ctx.restore();
           return;
         }
 
         // 画笔/橡皮擦类型：绘制路径
+        const isComplete = relativeTime >= stroke.endTime;
+        
         if (stroke.points.length < 2) return;
 
         ctx.strokeStyle = stroke.color;
@@ -235,34 +113,15 @@ export const LiveDrawingReplay: React.FC<LiveDrawingReplayProps> = ({
             ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
           }
         } else {
-          // 笔画正在进行中，根据点的时间戳精确绘制
-          const hasTimestamps = stroke.points.some(p => p.timestamp !== undefined);
+          // 笔画正在进行中，按比例绘制
+          const strokeDuration = stroke.endTime - stroke.startTime;
+          const strokeProgress = (relativeTime - stroke.startTime) / strokeDuration;
+          const pointsToShow = Math.floor(stroke.points.length * strokeProgress);
 
-          if (hasTimestamps) {
-            // 使用时间戳精确回放
-            const visiblePoints = stroke.points.filter(p =>
-              p.timestamp === undefined || p.timestamp <= relativeTime
-            );
-
-            if (visiblePoints.length >= 2) {
-              ctx.moveTo(visiblePoints[0].x, visiblePoints[0].y);
-              for (let i = 1; i < visiblePoints.length; i++) {
-                ctx.lineTo(visiblePoints[i].x, visiblePoints[i].y);
-              }
-            } else if (visiblePoints.length === 1) {
-              // 只有起始点，画个小圆点
-              ctx.arc(visiblePoints[0].x, visiblePoints[0].y, ctx.lineWidth / 2, 0, Math.PI * 2);
-              ctx.fill();
-            }
-          } else {
-            // 兼容旧数据：按比例绘制
-            const pointsToShow = Math.max(2, Math.floor(stroke.points.length * strokeProgress));
-
-            if (pointsToShow >= 2) {
-              ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
-              for (let i = 1; i < pointsToShow; i++) {
-                ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
-              }
+          if (pointsToShow >= 2) {
+            ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+            for (let i = 1; i < pointsToShow; i++) {
+              ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
             }
           }
         }
@@ -271,17 +130,6 @@ export const LiveDrawingReplay: React.FC<LiveDrawingReplayProps> = ({
       });
 
       ctx.globalCompositeOperation = 'source-over';
-
-      // 绘制调试信息：显示有多少笔画被绘制
-      ctx.font = '16px Arial';
-      ctx.fillStyle = 'yellow';
-      ctx.shadowColor = 'black';
-      ctx.shadowBlur = 2;
-      ctx.fillText(`Strokes: ${drawnCount}/${liveDrawingData.strokes.length}`, 10, 25);
-      ctx.fillText(`Video: ${currentVideoTime.toFixed(2)}s`, 10, 45);
-      ctx.fillText(`Relative: ${relativeTime.toFixed(2)}s`, 10, 65);
-      ctx.fillText(`Start: ${startTimestamp.toFixed(2)}s`, 10, 85);
-      ctx.shadowBlur = 0;
 
       // 继续下一帧
       animationFrameRef.current = requestAnimationFrame(renderFrame);

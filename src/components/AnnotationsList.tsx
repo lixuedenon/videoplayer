@@ -4,7 +4,6 @@ import type { Annotation } from '../types/annotation';
 import type { VideoSegmentSettings } from '../types/videoSegment';
 import type { VideoFile } from '../types/video';
 import { downloadVideoSegment } from '../utils/videoSegmentDownload';
-import { downloadAnnotationVideo } from '../utils/downloadAnnotationVideo';
 import { getFileURL } from '../utils/localFileStorage';
 import { searchAnnotations } from '../utils/database';
 
@@ -267,13 +266,7 @@ export const AnnotationsList: React.FC<AnnotationsListProps> = ({
         }
 
         try {
-          // 如果有涂鸦数据，使用专用下载函数（合成视频+涂鸦动画）
-          if (annotation.live_drawing_data && annotation.live_drawing_data.strokes && annotation.live_drawing_data.strokes.length > 0) {
-            await downloadAnnotationVideo(videoElement, annotation, startTime, endTime, filename);
-          } else {
-            // 没有涂鸦数据，只下载视频片段
-            await downloadVideoSegment(videoElement, startTime, endTime, filename);
-          }
+          await downloadVideoSegment(videoElement, startTime, endTime, filename);
           if (!aborted) {
             resolve();
           }

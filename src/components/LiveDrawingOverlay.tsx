@@ -36,14 +36,6 @@ interface Point {
   y: number;
 }
 
-interface TransformKeyframe {
-  time: number;
-  points?: Point[];
-  rotation?: number;
-  symbolSize?: number;
-  fontSize?: number;
-}
-
 interface Stroke {
   tool: DrawingTool;
   color: string;
@@ -63,8 +55,6 @@ interface Stroke {
   shapeType?: ShapeType;
   filled?: boolean;
   rotation?: number;  // 旋转角度（度数，0-360）
-  // 变换关键帧
-  transforms?: TransformKeyframe[];
 }
 
 export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
@@ -88,7 +78,6 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
   const [showCustomSymbolManager, setShowCustomSymbolManager] = useState(false);
   const [isShapeDrawing, setIsShapeDrawing] = useState(false);
   const [shapeStartPoint, setShapeStartPoint] = useState<Point | null>(null);
-  const [shapeStartTime, setShapeStartTime] = useState<number>(0);
   const [strokes, setStrokes] = useState<Stroke[]>([]);
   const [currentStroke, setCurrentStroke] = useState<Point[]>([]);
   const [startTimestamp, setStartTimestamp] = useState<number>(0);
@@ -103,92 +92,12 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
   const [dragStartPoint, setDragStartPoint] = useState<Point | null>(null);
   const [activeControlPoint, setActiveControlPoint] = useState<string | null>(null); // 'tl', 'tr', 'bl', 'br', 'tm', 'bm', 'ml', 'mr', 'rotate'
 
-  // 高频录制状态
-  const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
-
-  // 变换预览状态（用于高频记录）
-  const transformPreviewRef = useRef<{
-    strokeIndex: number;
-    preview: Stroke;
-  } | null>(null);
-
   // 初始化开始时间
   useEffect(() => {
     if (isActive && videoElement) {
       setStartTimestamp(videoElement.currentTime);
     }
   }, [isActive, videoElement]);
-
-  // 高频录制：每20ms记录一次所有形状状态（方案1）
-  useEffect(() => {
-    if (!isActive || !videoElement) {
-      // 清理定时器
-      if (recordingIntervalRef.current) {
-        clearInterval(recordingIntervalRef.current);
-        recordingIntervalRef.current = null;
-      }
-      return;
-    }
-
-    // 启动高频记录
-    recordingIntervalRef.current = setInterval(() => {
-      recordStateSnapshot();
-    }, 20); // 每20ms = 50fps
-
-    return () => {
-      if (recordingIntervalRef.current) {
-        clearInterval(recordingIntervalRef.current);
-        recordingIntervalRef.current = null;
-      }
-    };
-  }, [isActive, videoElement, strokes]);
-
-  // 记录当前所有形状的状态快照
-  const recordStateSnapshot = () => {
-    if (!videoElement) return;
-
-    const currentTime = videoElement.currentTime - startTimestamp;
-
-    // 如果正在变换某个stroke，记录关键帧
-    if (transformPreviewRef.current) {
-      const { strokeIndex, preview } = transformPreviewRef.current;
-
-      setStrokes(prevStrokes =>
-        prevStrokes.map((stroke, idx) => {
-          if (idx === strokeIndex) {
-            // 为正在变换的stroke添加关键帧
-            const keyframe: TransformKeyframe = {
-              time: currentTime,
-              points: preview.points,
-              rotation: preview.rotation,
-              symbolSize: preview.symbolSize,
-              fontSize: preview.fontSize
-            };
-
-            return {
-              ...stroke,
-              endTime: currentTime,
-              transforms: [...(stroke.transforms || []), keyframe]
-            };
-          } else {
-            // 其他stroke只更新endTime
-            return {
-              ...stroke,
-              endTime: currentTime
-            };
-          }
-        })
-      );
-    } else {
-      // 没有变换时，只更新所有stroke的endTime
-      setStrokes(prevStrokes =>
-        prevStrokes.map(stroke => ({
-          ...stroke,
-          endTime: currentTime
-        }))
-      );
-    }
-  };
 
   // 初始化canvas
   useEffect(() => {
@@ -253,13 +162,13 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
         drawText(ctx, stroke);
         return;
       }
-
+      
       // 符号类型：使用drawSymbol绘制
       if (stroke.tool === 'symbol') {
         drawSymbol(ctx, stroke);
         return;
       }
-
+      
       // 形状类型：使用drawShape绘制
       if (stroke.tool === 'shape' && stroke.shapeType && stroke.points.length >= 2) {
         drawShape(ctx, stroke.shapeType, stroke.points[0], stroke.points[1], {
@@ -270,7 +179,7 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
         });
         return;
       }
-
+      
       // 画笔/橡皮擦类型：绘制路径
       if (stroke.points.length < 2) return;
 
@@ -296,11 +205,6 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
     });
 
     ctx.globalCompositeOperation = 'source-over';
-
-    // 如果有选中的stroke，绘制选中框
-    if (selectedStrokeIndex !== null && selectedStrokeIndex < strokes.length) {
-      drawSelectionBox(ctx, strokes[selectedStrokeIndex]);
-    }
   };
 
   // 获取鼠标在canvas上的坐标
@@ -427,7 +331,6 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
       if (!selectedShape || !videoElement) return;
       setIsShapeDrawing(true);
       setShapeStartPoint(point);
-      setShapeStartTime(videoElement.currentTime - startTimestamp);
       return;
     }
     
@@ -474,14 +377,8 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
     
     // 画笔/橡皮擦：开始绘制
     setIsDrawing(true);
-
-    // 给起始点添加时间戳
-    const pointWithTime = {
-      ...point,
-      timestamp: videoElement ? videoElement.currentTime - startTimestamp : 0
-    };
-    setCurrentStroke([pointWithTime]);
-
+    setCurrentStroke([point]);
+    
     // 记录笔画开始时间（相对于标注开始时间）
     if (videoElement) {
       setCurrentStrokeStartTime(videoElement.currentTime - startTimestamp);
@@ -490,15 +387,15 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const point = getCanvasCoordinates(e);
-
+    
     // 选择工具：拖拽移动或变换
     if (currentTool === 'select' && selectedStrokeIndex !== null && dragStartPoint) {
       const dx = point.x - dragStartPoint.x;
       const dy = point.y - dragStartPoint.y;
-
+      
       const selectedStroke = strokes[selectedStrokeIndex];
       let previewStroke = { ...selectedStroke };
-
+      
       if (activeControlPoint) {
         // 操作控制点：缩放/旋转
         if (activeControlPoint === 'rotate') {
@@ -509,7 +406,7 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
             symbolId: previewStroke.symbolId,
             pointsLength: previewStroke.points.length
           });
-
+          
           // 支持形状和符号的旋转
           if ((previewStroke.tool === 'shape' || previewStroke.tool === 'symbol') && previewStroke.points.length >= 1) {
             // 计算中心点
@@ -524,7 +421,7 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
               centerX = (p1.x + p2.x) / 2;
               centerY = (p1.y + p2.y) / 2;
             }
-
+            
             // 计算旋转角度
             const angle = Math.atan2(point.y - centerY, point.x - centerX);
             const degrees = (angle * 180 / Math.PI + 90 + 360) % 360;
@@ -536,13 +433,13 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
             const [p1, p2] = previewStroke.points;
             let left = Math.min(p1.x, p2.x), right = Math.max(p1.x, p2.x);
             let top = Math.min(p1.y, p2.y), bottom = Math.max(p1.y, p2.y);
-
+            
             // 只保留右下角缩放
             if (activeControlPoint === 'br') {
               right += dx;
               bottom += dy;
             }
-
+            
             previewStroke.points = [{ x: left, y: top }, { x: right, y: bottom }];
           } else if (previewStroke.tool === 'text' || previewStroke.tool === 'symbol') {
             // 文字/符号缩放：改变大小
@@ -554,7 +451,7 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
             }
           }
         }
-
+        
       } else if (isDraggingStroke) {
         // 移动整个stroke
         previewStroke.points = selectedStroke.points.map(p => ({
@@ -562,13 +459,7 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
           y: p.y + dy
         }));
       }
-
-      // 更新变换预览ref，供高频记录使用
-      transformPreviewRef.current = {
-        strokeIndex: selectedStrokeIndex,
-        preview: previewStroke
-      };
-
+      
       // 实时绘制预览（不保存到strokes）
       redrawAll();
       const canvas = canvasRef.current;
@@ -630,15 +521,10 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
     // 画笔/橡皮擦
     if (!isDrawing) return;
 
-    // 添加时间戳用于回放，但不影响绘制流畅度
-    const pointWithTimestamp = {
-      ...point,
-      timestamp: videoElement ? videoElement.currentTime - startTimestamp : 0
-    };
-    const newStroke = [...currentStroke, pointWithTimestamp];
+    const newStroke = [...currentStroke, point];
     setCurrentStroke(newStroke);
 
-    // 实时绘制当前笔画段（增量绘制，保持流畅）
+    // 实时绘制当前笔画
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -750,10 +636,7 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
       setIsDraggingStroke(false);
       setActiveControlPoint(null);
       setDragStartPoint(null);
-
-      // 清空变换预览ref
-      transformPreviewRef.current = null;
-
+      
       // 松开后手动重绘以保持选中框显示
       setTimeout(() => {
         const canvas = canvasRef.current;
@@ -817,16 +700,16 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
         color: penColor,
         width: penWidth,
         points: [shapeStartPoint, point],
-        startTime: shapeStartTime,
+        startTime: videoElement.currentTime - startTimestamp,
         endTime: videoElement.currentTime - startTimestamp,
         shapeType: selectedShape.type,
         filled: false
       };
-
+      
       setStrokes(prev => [...prev, shapeStroke]);
       setIsShapeDrawing(false);
       setShapeStartPoint(null);
-
+      
       // 注意：不要立即调用redrawCanvas，让useEffect处理
       return;
     }

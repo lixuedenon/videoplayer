@@ -2,7 +2,7 @@ import { Annotation } from '../types/annotation';
 import { VideoSegment } from '../types/videoSegment';
 
 const DB_NAME = 'VideoAnnotationDB';
-const DB_VERSION = 3;  // 升级到版本3，仅支持动态涂鸦
+const DB_VERSION = 2;  // 升级到版本2，支持动态涂鸦
 const ANNOTATIONS_STORE = 'annotations';
 const VIDEO_SEGMENTS_STORE = 'video_segments';
 
@@ -53,6 +53,15 @@ export async function initDB(): Promise<IDBDatabase> {
         annotationsStore.createIndex('name', 'name', { unique: false });
         annotationsStore.createIndex('text_content', 'text_content', { unique: false });
         annotationsStore.createIndex('created_at', 'created_at', { unique: false });
+        annotationsStore.createIndex('is_live', 'is_live', { unique: false });
+      } 
+      // 版本升级：从1到2，添加动态涂鸦支持
+      else if (oldVersion < 2) {
+        const annotationsStore = transaction.objectStore(ANNOTATIONS_STORE);
+        // 添加is_live索引（如果不存在）
+        if (!annotationsStore.indexNames.contains('is_live')) {
+          annotationsStore.createIndex('is_live', 'is_live', { unique: false });
+        }
       }
 
       if (!db.objectStoreNames.contains(VIDEO_SEGMENTS_STORE)) {
@@ -77,10 +86,12 @@ export async function addAnnotation(annotation: IndexedDBAnnotation): Promise<An
     id,
     video_url: annotation.video_url,
     timestamp: annotation.timestamp,
-    live_drawing_data: annotation.live_drawing_data,
+    drawing_data: annotation.drawing_data,
     thumbnail: annotation.thumbnail,
     name: annotation.name ?? undefined,
     text_content: annotation.text_content ?? undefined,
+    live_drawing_data: annotation.live_drawing_data ?? undefined,
+    is_live: annotation.is_live ?? undefined,
     created_at
   };
 

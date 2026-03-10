@@ -34,8 +34,8 @@ async function loadFFmpeg(onProgress?: (progress: number) => void): Promise<FFmp
       console.log('[FFmpeg]', message);
     });
 
-    // 加载FFmpeg核心文件（从CDN - 单线程版本）
-    const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
+    // 加载FFmpeg核心文件（从本地public目录 - 单线程版本）
+    const baseURL = '/ffmpeg';
     await ffmpeg.load({
       coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
       wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
