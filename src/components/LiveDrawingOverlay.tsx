@@ -422,8 +422,14 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
     
     // 画笔/橡皮擦：开始绘制
     setIsDrawing(true);
-    setCurrentStroke([point]);
-    
+
+    // 给起始点添加时间戳
+    const pointWithTime = {
+      ...point,
+      timestamp: videoElement ? videoElement.currentTime - startTimestamp : 0
+    };
+    setCurrentStroke([pointWithTime]);
+
     // 记录笔画开始时间（相对于标注开始时间）
     if (videoElement) {
       setCurrentStrokeStartTime(videoElement.currentTime - startTimestamp);
@@ -566,7 +572,12 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
     // 画笔/橡皮擦
     if (!isDrawing) return;
 
-    const newStroke = [...currentStroke, point];
+    // 给每个点添加时间戳（相对于标注开始时间）
+    const pointWithTime = {
+      ...point,
+      timestamp: videoElement ? videoElement.currentTime - startTimestamp : 0
+    };
+    const newStroke = [...currentStroke, pointWithTime];
     setCurrentStroke(newStroke);
 
     // 实时绘制当前笔画

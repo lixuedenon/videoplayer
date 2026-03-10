@@ -4,6 +4,7 @@
 export interface Point {
   x: number;
   y: number;
+  timestamp?: number;  // 点的时间戳（相对于标注开始的秒数）
 }
 
 // 动态涂鸦的时间轴笔画
