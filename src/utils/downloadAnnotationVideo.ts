@@ -43,8 +43,8 @@ export async function downloadAnnotationVideo(
       return false;
     }
 
-    // 检查是否有涂鸦数据
-    const hasDrawing = annotation.is_live && annotation.live_drawing_data;
+    // 检查是否有涂鸦数据（所有annotation都应该有live_drawing_data）
+    const hasDrawing = annotation.live_drawing_data && annotation.live_drawing_data.strokes && annotation.live_drawing_data.strokes.length > 0;
 
     // 创建隐藏的视频元素
     const hiddenVideo = document.createElement('video');

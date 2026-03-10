@@ -55,5 +55,6 @@ export interface Annotation {
   thumbnail?: string;
   name?: string;
   text_content?: string;
+  is_live?: boolean;  // 标记是否为实时涂鸦
   created_at: string;
 }

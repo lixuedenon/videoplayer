@@ -267,10 +267,11 @@ export const AnnotationsList: React.FC<AnnotationsListProps> = ({
         }
 
         try {
-          // 如果有涂鸦数据，使用专用下载函数
-          if (annotation.is_live && annotation.live_drawing_data) {
+          // 如果有涂鸦数据，使用专用下载函数（合成视频+涂鸦动画）
+          if (annotation.live_drawing_data && annotation.live_drawing_data.strokes && annotation.live_drawing_data.strokes.length > 0) {
             await downloadAnnotationVideo(videoElement, annotation, startTime, endTime, filename);
           } else {
+            // 没有涂鸦数据，只下载视频片段
             await downloadVideoSegment(videoElement, startTime, endTime, filename);
           }
           if (!aborted) {
