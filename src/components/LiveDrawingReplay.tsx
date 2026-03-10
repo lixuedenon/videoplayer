@@ -103,27 +103,83 @@ export const LiveDrawingReplay: React.FC<LiveDrawingReplayProps> = ({
         const strokeDuration = stroke.endTime - stroke.startTime;
         const strokeProgress = Math.min(1, Math.max(0, (relativeTime - stroke.startTime) / strokeDuration));
 
-        // 文字类型：直接显示
+        // 计算当前时刻的变换状态（使用关键帧插值）
+        let currentPoints = stroke.points;
+        let currentRotation = stroke.rotation;
+        let currentSymbolSize = stroke.symbolSize;
+        let currentFontSize = stroke.fontSize;
+
+        if (stroke.transforms && stroke.transforms.length > 0) {
+          // 找到当前时间对应的关键帧区间
+          const transforms = stroke.transforms;
+
+          // 找到最后一个时间小于等于当前时间的关键帧
+          let prevKeyframe = null;
+          let nextKeyframe = null;
+
+          for (let i = 0; i < transforms.length; i++) {
+            if (transforms[i].time <= relativeTime) {
+              prevKeyframe = transforms[i];
+            } else if (nextKeyframe === null && transforms[i].time > relativeTime) {
+              nextKeyframe = transforms[i];
+              break;
+            }
+          }
+
+          // 如果有关键帧，进行插值
+          if (prevKeyframe) {
+            if (nextKeyframe) {
+              // 在两个关键帧之间插值
+              const t = (relativeTime - prevKeyframe.time) / (nextKeyframe.time - prevKeyframe.time);
+
+              if (prevKeyframe.points && nextKeyframe.points) {
+                currentPoints = prevKeyframe.points.map((p, i) => ({
+                  x: p.x + (nextKeyframe.points![i].x - p.x) * t,
+                  y: p.y + (nextKeyframe.points![i].y - p.y) * t
+                }));
+              }
+
+              if (prevKeyframe.rotation !== undefined && nextKeyframe.rotation !== undefined) {
+                currentRotation = prevKeyframe.rotation + (nextKeyframe.rotation - prevKeyframe.rotation) * t;
+              }
+
+              if (prevKeyframe.symbolSize !== undefined && nextKeyframe.symbolSize !== undefined) {
+                currentSymbolSize = prevKeyframe.symbolSize + (nextKeyframe.symbolSize - prevKeyframe.symbolSize) * t;
+              }
+
+              if (prevKeyframe.fontSize !== undefined && nextKeyframe.fontSize !== undefined) {
+                currentFontSize = prevKeyframe.fontSize + (nextKeyframe.fontSize - prevKeyframe.fontSize) * t;
+              }
+            } else {
+              // 使用最后一个关键帧的值
+              if (prevKeyframe.points) currentPoints = prevKeyframe.points;
+              if (prevKeyframe.rotation !== undefined) currentRotation = prevKeyframe.rotation;
+              if (prevKeyframe.symbolSize !== undefined) currentSymbolSize = prevKeyframe.symbolSize;
+              if (prevKeyframe.fontSize !== undefined) currentFontSize = prevKeyframe.fontSize;
+            }
+          }
+        }
+
+        // 文字类型：使用插值后的值
         if (stroke.tool === 'text' && stroke.text) {
           ctx.save();
-          ctx.font = `${stroke.fontSize || 24}px Arial`;
+          ctx.font = `${currentFontSize || 24}px Arial`;
           ctx.fillStyle = stroke.color;
           ctx.textAlign = 'left';
           ctx.textBaseline = 'top';
-          ctx.fillText(stroke.text, stroke.points[0].x, stroke.points[0].y);
+          ctx.fillText(stroke.text, currentPoints[0].x, currentPoints[0].y);
           ctx.restore();
           return;
         }
 
-        // 符号类型：直接显示
+        // 符号类型：使用插值后的值
         if (stroke.tool === 'symbol' && stroke.symbolChar) {
           ctx.save();
-          ctx.translate(stroke.points[0].x, stroke.points[0].y);
-          const rotation = stroke.rotation !== undefined ? stroke.rotation : stroke.symbolRotation;
-          if (rotation) {
-            ctx.rotate((rotation * Math.PI) / 180);
+          ctx.translate(currentPoints[0].x, currentPoints[0].y);
+          if (currentRotation) {
+            ctx.rotate((currentRotation * Math.PI) / 180);
           }
-          ctx.font = `${stroke.symbolSize || 40}px Arial`;
+          ctx.font = `${currentSymbolSize || 40}px Arial`;
           ctx.fillStyle = stroke.color;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
@@ -132,25 +188,25 @@ export const LiveDrawingReplay: React.FC<LiveDrawingReplayProps> = ({
           return;
         }
 
-        // 形状类型：按进度显示（拖动放大效果）
-        if (stroke.tool === 'shape' && stroke.shapeType && stroke.points.length >= 2) {
+        // 形状类型：使用插值后的值
+        if (stroke.tool === 'shape' && stroke.shapeType && currentPoints.length >= 2) {
           ctx.save();
 
-          // 如果形状正在绘制中，按进度插值
-          let endPoint = stroke.points[1];
-          if (!isComplete) {
-            const startPoint = stroke.points[0];
+          // 如果形状正在绘制中（首次创建），按进度插值
+          let endPoint = currentPoints[1];
+          if (!isComplete && (!stroke.transforms || stroke.transforms.length === 0)) {
+            const startPoint = currentPoints[0];
             endPoint = {
-              x: startPoint.x + (stroke.points[1].x - startPoint.x) * strokeProgress,
-              y: startPoint.y + (stroke.points[1].y - startPoint.y) * strokeProgress
+              x: startPoint.x + (currentPoints[1].x - startPoint.x) * strokeProgress,
+              y: startPoint.y + (currentPoints[1].y - startPoint.y) * strokeProgress
             };
           }
 
-          drawShape(ctx, stroke.shapeType, stroke.points[0], endPoint, {
+          drawShape(ctx, stroke.shapeType, currentPoints[0], endPoint, {
             color: stroke.color,
             width: stroke.width,
             filled: stroke.filled || false,
-            rotation: stroke.rotation
+            rotation: currentRotation
           });
           ctx.restore();
           return;

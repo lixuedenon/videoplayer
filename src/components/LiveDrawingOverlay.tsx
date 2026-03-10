@@ -36,6 +36,14 @@ interface Point {
   y: number;
 }
 
+interface TransformKeyframe {
+  time: number;
+  points?: Point[];
+  rotation?: number;
+  symbolSize?: number;
+  fontSize?: number;
+}
+
 interface Stroke {
   tool: DrawingTool;
   color: string;
@@ -55,6 +63,8 @@ interface Stroke {
   shapeType?: ShapeType;
   filled?: boolean;
   rotation?: number;  // 旋转角度（度数，0-360）
+  // 变换关键帧
+  transforms?: TransformKeyframe[];
 }
 
 export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
@@ -96,6 +106,12 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
   // 高频录制状态
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
+  // 变换预览状态（用于高频记录）
+  const transformPreviewRef = useRef<{
+    strokeIndex: number;
+    preview: Stroke;
+  } | null>(null);
+
   // 初始化开始时间
   useEffect(() => {
     if (isActive && videoElement) {
@@ -133,14 +149,45 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
 
     const currentTime = videoElement.currentTime - startTimestamp;
 
-    // 更新所有stroke的endTime为当前时间
-    // 这样每个stroke在回放时会一直显示到最新的记录点
-    setStrokes(prevStrokes =>
-      prevStrokes.map(stroke => ({
-        ...stroke,
-        endTime: currentTime
-      }))
-    );
+    // 如果正在变换某个stroke，记录关键帧
+    if (transformPreviewRef.current) {
+      const { strokeIndex, preview } = transformPreviewRef.current;
+
+      setStrokes(prevStrokes =>
+        prevStrokes.map((stroke, idx) => {
+          if (idx === strokeIndex) {
+            // 为正在变换的stroke添加关键帧
+            const keyframe: TransformKeyframe = {
+              time: currentTime,
+              points: preview.points,
+              rotation: preview.rotation,
+              symbolSize: preview.symbolSize,
+              fontSize: preview.fontSize
+            };
+
+            return {
+              ...stroke,
+              endTime: currentTime,
+              transforms: [...(stroke.transforms || []), keyframe]
+            };
+          } else {
+            // 其他stroke只更新endTime
+            return {
+              ...stroke,
+              endTime: currentTime
+            };
+          }
+        })
+      );
+    } else {
+      // 没有变换时，只更新所有stroke的endTime
+      setStrokes(prevStrokes =>
+        prevStrokes.map(stroke => ({
+          ...stroke,
+          endTime: currentTime
+        }))
+      );
+    }
   };
 
   // 初始化canvas
@@ -443,15 +490,15 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const point = getCanvasCoordinates(e);
-    
+
     // 选择工具：拖拽移动或变换
     if (currentTool === 'select' && selectedStrokeIndex !== null && dragStartPoint) {
       const dx = point.x - dragStartPoint.x;
       const dy = point.y - dragStartPoint.y;
-      
+
       const selectedStroke = strokes[selectedStrokeIndex];
       let previewStroke = { ...selectedStroke };
-      
+
       if (activeControlPoint) {
         // 操作控制点：缩放/旋转
         if (activeControlPoint === 'rotate') {
@@ -462,7 +509,7 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
             symbolId: previewStroke.symbolId,
             pointsLength: previewStroke.points.length
           });
-          
+
           // 支持形状和符号的旋转
           if ((previewStroke.tool === 'shape' || previewStroke.tool === 'symbol') && previewStroke.points.length >= 1) {
             // 计算中心点
@@ -477,7 +524,7 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
               centerX = (p1.x + p2.x) / 2;
               centerY = (p1.y + p2.y) / 2;
             }
-            
+
             // 计算旋转角度
             const angle = Math.atan2(point.y - centerY, point.x - centerX);
             const degrees = (angle * 180 / Math.PI + 90 + 360) % 360;
@@ -489,13 +536,13 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
             const [p1, p2] = previewStroke.points;
             let left = Math.min(p1.x, p2.x), right = Math.max(p1.x, p2.x);
             let top = Math.min(p1.y, p2.y), bottom = Math.max(p1.y, p2.y);
-            
+
             // 只保留右下角缩放
             if (activeControlPoint === 'br') {
               right += dx;
               bottom += dy;
             }
-            
+
             previewStroke.points = [{ x: left, y: top }, { x: right, y: bottom }];
           } else if (previewStroke.tool === 'text' || previewStroke.tool === 'symbol') {
             // 文字/符号缩放：改变大小
@@ -507,7 +554,7 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
             }
           }
         }
-        
+
       } else if (isDraggingStroke) {
         // 移动整个stroke
         previewStroke.points = selectedStroke.points.map(p => ({
@@ -515,7 +562,13 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
           y: p.y + dy
         }));
       }
-      
+
+      // 更新变换预览ref，供高频记录使用
+      transformPreviewRef.current = {
+        strokeIndex: selectedStrokeIndex,
+        preview: previewStroke
+      };
+
       // 实时绘制预览（不保存到strokes）
       redrawAll();
       const canvas = canvasRef.current;
@@ -697,7 +750,10 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
       setIsDraggingStroke(false);
       setActiveControlPoint(null);
       setDragStartPoint(null);
-      
+
+      // 清空变换预览ref
+      transformPreviewRef.current = null;
+
       // 松开后手动重绘以保持选中框显示
       setTimeout(() => {
         const canvas = canvasRef.current;

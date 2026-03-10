@@ -7,6 +7,15 @@ export interface Point {
   timestamp?: number;  // 点的时间戳（相对于标注开始的秒数）
 }
 
+// 变换关键帧（用于记录移动、旋转、缩放的过程）
+export interface TransformKeyframe {
+  time: number;  // 相对于标注开始的时间（秒）
+  points?: Point[];  // 位置/大小变化
+  rotation?: number;  // 旋转角度
+  symbolSize?: number;  // 符号大小
+  fontSize?: number;  // 文字大小
+}
+
 // 动态涂鸦的时间轴笔画
 export interface LiveStroke {
   tool: 'pen' | 'eraser' | 'symbol' | 'text' | 'shape';
@@ -24,10 +33,10 @@ export interface LiveStroke {
   text?: string;
   fontSize?: number;
   // 形状相关字段 - 完整的35种形状类型定义
-  shapeType?: 'freepen' 
+  shapeType?: 'freepen'
     // 基础形状
-    | 'circle' | 'rectangle' | 'roundRect' | 'diamond' 
-    | 'triangleUp' | 'triangleDown' | 'triangleLeft' | 'triangleRight' 
+    | 'circle' | 'rectangle' | 'roundRect' | 'diamond'
+    | 'triangleUp' | 'triangleDown' | 'triangleLeft' | 'triangleRight'
     | 'hexagon' | 'star'
     // 线条类
     | 'line' | 'vertical' | 'horizontal' | 'diagonal45' | 'diagonal135' | 'parallel'
@@ -38,6 +47,9 @@ export interface LiveStroke {
     | 'angle' | 'perpendicular' | 'parallelSymbol' | 'arc' | 'circlePlus' | 'circleCross';
   filled?: boolean;
   rotation?: number;  // 旋转角度（度数，0-360）
+
+  // 变换关键帧数组（记录后续的移动、旋转、缩放）
+  transforms?: TransformKeyframe[];
 }
 
 // 动态涂鸦数据
