@@ -179,35 +179,13 @@ export const LiveDrawingReplay: React.FC<LiveDrawingReplayProps> = ({
             ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
           }
         } else {
-          // 笔画正在进行中，根据点的时间戳精确绘制
-          // 如果点有时间戳，按时间戳过滤；否则用原来的按比例方式
-          const hasTimestamp = stroke.points.some(p => p.timestamp !== undefined);
+          // 笔画正在进行中，按比例绘制
+          const pointsToShow = Math.max(2, Math.floor(stroke.points.length * strokeProgress));
 
-          if (hasTimestamp) {
-            // 精确模式：找出所有时间戳小于等于当前相对时间的点
-            const visiblePoints = stroke.points.filter(p =>
-              p.timestamp === undefined || p.timestamp <= relativeTime
-            );
-
-            if (visiblePoints.length >= 2) {
-              ctx.moveTo(visiblePoints[0].x, visiblePoints[0].y);
-              for (let i = 1; i < visiblePoints.length; i++) {
-                ctx.lineTo(visiblePoints[i].x, visiblePoints[i].y);
-              }
-            } else if (visiblePoints.length === 1) {
-              // 只有一个点，画个小圆点
-              ctx.arc(visiblePoints[0].x, visiblePoints[0].y, ctx.lineWidth / 2, 0, Math.PI * 2);
-              ctx.fill();
-            }
-          } else {
-            // 降级模式：按比例绘制（兼容旧数据）
-            const pointsToShow = Math.floor(stroke.points.length * strokeProgress);
-
-            if (pointsToShow >= 2) {
-              ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
-              for (let i = 1; i < pointsToShow; i++) {
-                ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
-              }
+          if (pointsToShow >= 2) {
+            ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+            for (let i = 1; i < pointsToShow; i++) {
+              ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
             }
           }
         }

@@ -577,46 +577,35 @@ export const LiveDrawingOverlay: React.FC<LiveDrawingOverlayProps> = ({
     // 画笔/橡皮擦
     if (!isDrawing) return;
 
-    // 给每个点添加时间戳（相对于标注开始时间）
-    const pointWithTime = {
-      ...point,
-      timestamp: videoElement ? videoElement.currentTime - startTimestamp : 0
-    };
-    const newStroke = [...currentStroke, pointWithTime];
+    const newStroke = [...currentStroke, point];
     setCurrentStroke(newStroke);
 
-    // 实时绘制：重绘所有已完成的笔画 + 当前笔画
+    // 实时绘制当前笔画段
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // 先重绘所有已保存的笔画
-    redrawAll();
-
-    // 然后绘制当前正在画的笔画
-    if (newStroke.length >= 2) {
-      if (currentTool === 'eraser') {
-        ctx.globalCompositeOperation = 'destination-out';
-      } else {
-        ctx.globalCompositeOperation = 'source-over';
-      }
-
-      ctx.strokeStyle = penColor;
-      ctx.lineWidth = penWidth;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-
-      ctx.beginPath();
-      ctx.moveTo(newStroke[0].x, newStroke[0].y);
-      for (let i = 1; i < newStroke.length; i++) {
-        ctx.lineTo(newStroke[i].x, newStroke[i].y);
-      }
-      ctx.stroke();
-
+    if (currentTool === 'eraser') {
+      ctx.globalCompositeOperation = 'destination-out';
+    } else {
       ctx.globalCompositeOperation = 'source-over';
     }
+
+    ctx.strokeStyle = penColor;
+    ctx.lineWidth = penWidth;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    ctx.beginPath();
+    if (currentStroke.length > 0) {
+      ctx.moveTo(currentStroke[currentStroke.length - 1].x, currentStroke[currentStroke.length - 1].y);
+    }
+    ctx.lineTo(point.x, point.y);
+    ctx.stroke();
+
+    ctx.globalCompositeOperation = 'source-over';
   };
 
   const handleMouseUp = (e: React.MouseEvent<HTMLCanvasElement>) => {
