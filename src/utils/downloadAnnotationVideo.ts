@@ -174,17 +174,10 @@ export async function downloadAnnotationVideo(
           // 绘制视频帧
           ctx.drawImage(hiddenVideo, 0, 0, compositeCanvas.width, compositeCanvas.height);
 
-          // 添加视觉调试：绘制半透明绿色边框确认合成可见
-          ctx.strokeStyle = 'rgba(0, 255, 0, 0.5)';
-          ctx.lineWidth = 15;
-          ctx.strokeRect(0, 0, compositeCanvas.width, compositeCanvas.height);
-
           // 绘制涂鸦层
-          let drawnStrokesCount = 0;
           if (relativeTime >= 0) {
             drawingData.strokes.forEach((stroke: Stroke) => {
               if (relativeTime < stroke.startTime) return;
-              drawnStrokesCount++;
 
               // 文字
               if (stroke.tool === 'text' && stroke.text && stroke.points.length > 0) {
@@ -265,11 +258,6 @@ export async function downloadAnnotationVideo(
                 ctx.globalCompositeOperation = 'source-over';
               }
             });
-
-            // 绘制调试信息
-            ctx.font = '30px Arial';
-            ctx.fillStyle = 'red';
-            ctx.fillText(`Rec: ${drawnStrokesCount} strokes at ${relativeTime.toFixed(1)}s`, 20, 50);
           }
         };
 
